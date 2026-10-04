@@ -25,6 +25,7 @@ typedef void (^VendorDPIHandler)(int levelCount, int activeIndex, NSArray<NSNumb
 - (BOOL)isReady;
 
 - (NSArray<NSNumber *> *)readDPITableWithCount:(int *)count active:(int *)active;
+- (BOOL)setActiveDPIIndex:(int)index;
 
 - (void)beginPollingWithInterval:(NSTimeInterval)interval handler:(VendorDPIHandler)handler;
 - (void)stopPolling;

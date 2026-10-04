@@ -198,6 +198,18 @@ static uint8_t checksum7(const uint8_t *b) {
     return [self decodeKnownTable:reply count:count active:active];
 }
 
+- (BOOL)setActiveDPIIndex:(int)index {
+    if (!self.device) return NO;
+    uint8_t cmd[64] = {0}, reply[64] = {0};
+    cmd[0] = 0x54; // SET opcode for 0xD4 (GET = SET | 0x80)
+    cmd[1] = 0x00;
+    cmd[2] = (uint8_t)index;
+    cmd[3] = 0x07; // 7 levels
+    [self sendCommand:cmd reply:reply];
+    self.lastActive = index;
+    return YES;
+}
+
 // MARK: - polling
 
 // Own serial queue (the ~150 ms exchange must not block the UI); it speeds up for a moment
