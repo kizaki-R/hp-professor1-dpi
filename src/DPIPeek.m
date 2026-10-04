@@ -129,19 +129,62 @@ static NSString *timeString(NSDate *d) {
 
 @end
 
+// MARK: - MenuBar Attached Panel
+
+@interface MenuBarPanel : NSPanel
+@end
+
+@implementation MenuBarPanel
+- (BOOL)canBecomeKeyWindow { return YES; }
+- (BOOL)canBecomeMainWindow { return YES; }
+- (void)cancelOperation:(id)sender {
+    if ([self.delegate respondsToSelector:@selector(closePanelFromKey)]) {
+        [self.delegate performSelector:@selector(closePanelFromKey)];
+    } else {
+        [self orderOut:nil];
+    }
+}
+@end
+
 // MARK: - App delegate
 
-@interface AppDelegate : NSObject <NSApplicationDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
 @property (nonatomic, strong) NSStatusItem *statusItem;
-@property (nonatomic, strong) NSWindow *window;
+@property (nonatomic, strong) MenuBarPanel *window;
+@property (nonatomic, strong) NSVisualEffectView *effectView;
+@property (nonatomic, strong) NSTextField *titleLabel;
+@property (nonatomic, strong) NSTextField *badgeLabel;
+@property (nonatomic, strong) NSButton *pinCheck;
+@property (nonatomic, strong) NSButton *quitBtn;
+@property (nonatomic, strong) NSBox *headerSeparator;
+@property (nonatomic) BOOL pinned;
+@property (nonatomic) NSTimeInterval lastCloseTime;
+
 @property (nonatomic, strong) NSTextView *logView;
+@property (nonatomic, strong) NSScrollView *logScroll;
 @property (nonatomic, strong) NSTextField *accessLabel;
 @property (nonatomic, strong) NSTextField *deviceLabel;
-@property (nonatomic, strong) NSTextField *measureLabel;
-@property (nonatomic, strong) NSTextField *distanceField;
-@property (nonatomic, strong) NSTextField *hexField;
 @property (nonatomic, strong) NSButton *vendorOnlyCheck;
 @property (nonatomic, strong) NSMutableArray<NSTextField *> *presetFields;
+@property (nonatomic, strong) NSTextField *presetsLabel;
+@property (nonatomic, strong) NSButton *advancedCheck;
+@property (nonatomic, strong) NSButton *testHudBtn;
+@property (nonatomic, strong) NSArray *permRow;
+@property (nonatomic, strong) NSArray *monitorRow;
+@property (nonatomic, strong) NSArray *vendorRow;
+@property (nonatomic, strong) NSArray *logClearRow;
+@property (nonatomic, strong) NSArray *measureRow;
+@property (nonatomic, strong) NSArray *hexRow;
+@property (nonatomic, strong) NSMutableArray *advancedViews;
+@property (nonatomic) BOOL advancedMode;
+
+@property (nonatomic, strong) NSTextField *measureCaption;
+@property (nonatomic, strong) NSTextField *distanceField;
+@property (nonatomic, strong) NSTextField *cmLabel;
+@property (nonatomic, strong) NSTextField *measureLabel;
+@property (nonatomic, strong) NSTextField *hexLabel;
+@property (nonatomic, strong) NSTextField *hexField;
+
 @property (nonatomic, strong) HIDWatcher *watcher;
 @property (nonatomic, strong) VendorChannel *vendor;
 @property (nonatomic, strong) DPIMapper *mapper;
@@ -161,13 +204,17 @@ static NSString *timeString(NSDate *d) {
 
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
     (void)note;
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
     [self buildMenuBar];
     [self buildMainMenu];
 
     self.watcher = [HIDWatcher new];
     self.mapper = [DPIMapper loadFromDefaults];
     self.presetFields = [NSMutableArray array];
+    self.advancedViews = [NSMutableArray array];
+    self.advancedMode = [NSUserDefaults.standardUserDefaults boolForKey:@"DPIPeek.advancedMode"];
+    self.pinned = [NSUserDefaults.standardUserDefaults boolForKey:@"DPIPeek.pinned"];
+
     __weak AppDelegate *weakSelf = self;
     self.watcher.reportHandler = ^(HIDInterfaceInfo *iface, uint32_t reportID, NSData *payload, NSDate *when) {
         [weakSelf handleReport:iface reportID:reportID payload:payload when:when];
@@ -176,7 +223,6 @@ static NSString *timeString(NSDate *d) {
         [weakSelf appendLog:line];
     };
 
-    // keep the vendor polling timer alive while the app is in the background (App Nap would throttle it)
     self.activity = [NSProcessInfo.processInfo
                      beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep
                      reason:@"polling the mouse vendor channel for DPI changes"];
@@ -184,8 +230,7 @@ static NSString *timeString(NSDate *d) {
     [self openLogFile];
     [self buildWindow];
     [self refreshStatus];
-    // macOS applies a fresh Input Monitoring grant without requiring a relaunch;
-    // poll so monitoring starts the moment the switch is flipped.
+
     [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(permissionTick:) userInfo:nil repeats:YES];
 
     [self appendLog:@"DPI Peek 啟動。"];
@@ -213,6 +258,11 @@ static NSString *timeString(NSDate *d) {
             dispatch_async(dispatch_get_main_queue(), ^{ [self showPermissionAlert]; });
         }
     }
+
+    // Automatically drop down the panel on launch so user sees it right away
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self showPanel];
+    });
 }
 
 - (void)permissionTick:(NSTimer *)timer {
@@ -260,30 +310,97 @@ static NSString *timeString(NSDate *d) {
     [self.logFile closeFile];
 }
 
-// MARK: UI
+// MARK: - Menu Bar & Status Item
 
 - (void)buildMenuBar {
-    NSMenu *menu = [NSMenu new];
-    NSMenuItem *it;
-    it = [menu addItemWithTitle:@"顯示主視窗" action:@selector(showWindow:) keyEquivalent:@""];
-    it.target = self;
-    it = [menu addItemWithTitle:@"開始監看" action:@selector(startMonitoring:) keyEquivalent:@""];
-    it.target = self;
-    it = [menu addItemWithTitle:@"停止監看" action:@selector(stopMonitoring:) keyEquivalent:@""];
-    it.target = self;
-    [menu addItem:NSMenuItem.separatorItem];
-    it = [menu addItemWithTitle:@"測試 HUD" action:@selector(testHUD:) keyEquivalent:@""];
-    it.target = self;
-    it = [menu addItemWithTitle:@"輸入監控設定…" action:@selector(openPrivacySettings:) keyEquivalent:@""];
-    it.target = self;
-    [menu addItem:NSMenuItem.separatorItem];
-    it = [menu addItemWithTitle:@"結束" action:@selector(terminate:) keyEquivalent:@"q"];
-    it.target = NSApp;
-
-    self.statusItem = [NSStatusBar.systemStatusBar statusItemWithLength:NSVariableStatusItemLength];
+    self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
     self.statusItem.button.title = @"DPI";
-    self.statusItem.button.toolTip = @"DPI Peek — 顯示 HP Professor 1 的 DPI";
-    self.statusItem.menu = menu;
+    self.statusItem.button.toolTip = @"DPI Peek — 點擊切換面板";
+    self.statusItem.button.target = self;
+    self.statusItem.button.action = @selector(statusItemClicked:);
+    [self.statusItem.button sendActionOn:NSEventMaskLeftMouseUp | NSEventMaskRightMouseUp];
+}
+
+- (void)statusItemClicked:(id)sender {
+    NSEvent *event = [NSApp currentEvent];
+    if (event.type == NSEventTypeRightMouseUp) {
+        [self showContextMenu];
+        return;
+    }
+    [self togglePanel];
+}
+
+- (void)showContextMenu {
+    NSMenu *menu = [NSMenu new];
+    [menu addItemWithTitle:(self.window.isVisible ? @"隱藏面板" : @"顯示面板")
+                    action:@selector(togglePanel) keyEquivalent:@""];
+    [menu addItem:NSMenuItem.separatorItem];
+    [menu addItemWithTitle:@"測試 HUD" action:@selector(testHUD:) keyEquivalent:@""];
+    [menu addItemWithTitle:@"輸入監控設定…" action:@selector(openPrivacySettings:) keyEquivalent:@""];
+    [menu addItem:NSMenuItem.separatorItem];
+    [menu addItemWithTitle:@"結束" action:@selector(terminate:) keyEquivalent:@"q"];
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    [self.statusItem popUpStatusItemMenu:menu];
+#pragma clang diagnostic pop
+}
+
+- (void)togglePanel {
+    if (self.window.isVisible) {
+        [self closePanel];
+    } else {
+        NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+        if (now - self.lastCloseTime < 0.25) return;
+        [self showPanel];
+    }
+}
+
+- (void)positionPanelBelowStatusItem {
+    NSStatusBarButton *btn = self.statusItem.button;
+    if (!btn || !btn.window) return;
+    NSRect btnRect = [btn.window convertRectToScreen:btn.frame];
+    NSRect screenRect = btn.window.screen.visibleFrame;
+    if (NSIsEmptyRect(screenRect)) screenRect = NSScreen.mainScreen.visibleFrame;
+
+    CGFloat panelW = self.window.frame.size.width;
+    CGFloat panelH = self.window.frame.size.height;
+
+    CGFloat x = NSMidX(btnRect) - panelW / 2.0;
+    if (x + panelW > NSMaxX(screenRect) - 10.0) {
+        x = NSMaxX(screenRect) - panelW - 10.0;
+    }
+    if (x < NSMinX(screenRect) + 10.0) {
+        x = NSMinX(screenRect) + 10.0;
+    }
+
+    CGFloat y = NSMinY(btnRect) - panelH - 4.0;
+    [self.window setFrameOrigin:NSMakePoint(x, y)];
+}
+
+- (void)showPanel {
+    [self positionPanelBelowStatusItem];
+    [self.window makeKeyAndOrderFront:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+}
+
+- (void)closePanel {
+    self.lastCloseTime = [[NSDate date] timeIntervalSince1970];
+    [self.window orderOut:nil];
+}
+
+- (void)closePanelFromKey {
+    if (self.pinned) return;
+    [self closePanel];
+}
+
+- (void)windowDidResignKey:(NSNotification *)notification {
+    if (self.pinned || self.measuring) return;
+    [self closePanel];
+}
+
+- (void)togglePin:(id)sender {
+    self.pinned = (self.pinCheck.state == NSControlStateValueOn);
+    [NSUserDefaults.standardUserDefaults setBool:self.pinned forKey:@"DPIPeek.pinned"];
 }
 
 - (void)buildMainMenu {
@@ -312,89 +429,307 @@ static NSString *timeString(NSDate *d) {
     return l;
 }
 
-- (void)buildWindow {
-    NSRect frame = NSMakeRect(0, 0, 620, 780);
-    self.window = [[NSWindow alloc] initWithContentRect:frame
-                                              styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
-                                                         NSWindowStyleMaskMiniaturizable)
-                                                backing:NSBackingStoreBuffered
-                                                  defer:NO];
-    self.window.title = @"DPI Peek — HP Professor 1";
-    [self.window center];
-    NSView *cv = self.window.contentView;
+// MARK: - Panel UI Construction
 
-    self.accessLabel = [self label:@"權限狀態：檢查中…" x:12 w:596 y:748 size:13 bold:YES];
+- (void)buildWindow {
+    NSRect frame = NSMakeRect(0, 0, 480.0, 215.0);
+    self.window = [[MenuBarPanel alloc] initWithContentRect:frame
+                                                  styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel
+                                                    backing:NSBackingStoreBuffered
+                                                      defer:NO];
+    self.window.title = @"DPI Peek — HP Professor 1";
+    self.window.level = NSFloatingWindowLevel;
+    self.window.opaque = NO;
+    self.window.backgroundColor = [NSColor clearColor];
+    self.window.hasShadow = YES;
+    self.window.delegate = self;
+    self.window.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
+                                     NSWindowCollectionBehaviorFullScreenAuxiliary;
+
+    self.effectView = [[NSVisualEffectView alloc] initWithFrame:self.window.contentView.bounds];
+    self.effectView.material = NSVisualEffectMaterialHUDWindow;
+    self.effectView.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+    self.effectView.state = NSVisualEffectStateActive;
+    self.effectView.wantsLayer = YES;
+    self.effectView.layer.cornerRadius = 16.0;
+    self.effectView.layer.masksToBounds = YES;
+    self.effectView.layer.borderWidth = 1.0;
+    self.effectView.layer.borderColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.18].CGColor;
+    self.effectView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    self.window.contentView = self.effectView;
+    NSView *cv = self.effectView;
+
+    // Header Bar
+    self.titleLabel = [self label:@"DPI Peek" x:16 w:75 y:0 size:13 bold:YES];
+    self.titleLabel.textColor = [NSColor whiteColor];
+    [cv addSubview:self.titleLabel];
+
+    self.badgeLabel = [self label:@"2.4G 4000 DPI" x:94 w:205 y:0 size:11 bold:NO];
+    self.badgeLabel.textColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.75];
+    [cv addSubview:self.badgeLabel];
+
+    self.pinCheck = [NSButton checkboxWithTitle:@"📌 保持開啟" target:self action:@selector(togglePin:)];
+    self.pinCheck.toolTip = @"勾選後點擊外部不會自動關閉面板";
+    self.pinCheck.font = [NSFont systemFontOfSize:11];
+    self.pinCheck.state = self.pinned ? NSControlStateValueOn : NSControlStateValueOff;
+    [cv addSubview:self.pinCheck];
+
+    self.quitBtn = [self button:@"結束" action:@selector(terminate:) x:0 w:56 y:0];
+    self.quitBtn.font = [NSFont systemFontOfSize:11];
+    [cv addSubview:self.quitBtn];
+
+    self.headerSeparator = [[NSBox alloc] init];
+    self.headerSeparator.boxType = NSBoxSeparator;
+    [cv addSubview:self.headerSeparator];
+
+    // Status Section
+    self.accessLabel = [self label:@"權限狀態：檢查中…" x:16 w:448 y:0 size:12 bold:YES];
     [cv addSubview:self.accessLabel];
 
-    self.deviceLabel = [self label:@"裝置：尚未監看" x:12 w:596 y:724 size:12 bold:NO];
+    self.deviceLabel = [self label:@"裝置：尚未監看" x:16 w:448 y:0 size:11 bold:NO];
     self.deviceLabel.textColor = NSColor.secondaryLabelColor;
     [cv addSubview:self.deviceLabel];
 
-    [cv addSubview:[self button:@"要求輸入監控權限" action:@selector(requestAccess:) x:12 w:150 y:686]];
-    [cv addSubview:[self button:@"開啟系統設定" action:@selector(openPrivacySettings:) x:170 w:124 y:686]];
-    [cv addSubview:[self button:@"開始監看" action:@selector(startMonitoring:) x:302 w:90 y:686]];
-    [cv addSubview:[self button:@"停止" action:@selector(stopMonitoring:) x:400 w:60 y:686]];
-    [cv addSubview:[self button:@"重新掃描" action:@selector(rescan:) x:468 w:90 y:686]];
+    NSButton *askBtn = [self button:@"要求輸入監控權限" action:@selector(requestAccess:) x:0 w:140 y:0];
+    NSButton *setBtn = [self button:@"開啟系統設定" action:@selector(openPrivacySettings:) x:0 w:110 y:0];
+    askBtn.font = setBtn.font = [NSFont systemFontOfSize:11];
+    [cv addSubview:askBtn];
+    [cv addSubview:setBtn];
+    self.permRow = @[askBtn, setBtn];
 
-    [cv addSubview:[self button:@"清除記錄" action:@selector(clearLog:) x:12 w:90 y:650]];
-    [cv addSubview:[self button:@"開啟記錄資料夾" action:@selector(openLogFolder:) x:110 w:140 y:650]];
-    [cv addSubview:[self button:@"讀取滑鼠 DPI 表" action:@selector(readVendorTable:) x:258 w:150 y:650]];
-    [cv addSubview:[self button:@"重連原廠通道" action:@selector(redetectPressed:) x:416 w:120 y:650]];
+    // Presets Section (50px width each, centered in 480px, eliminating truncation)
+    self.presetsLabel = [self label:@"DPI 段數（共 7 段，留空 = 未設定）：" x:16 w:350 y:0 size:11 bold:YES];
+    [cv addSubview:self.presetsLabel];
 
-    self.vendorOnlyCheck = [NSButton checkboxWithTitle:@"只記錄廠商通道 (Report ID 6)" target:nil action:nil];
-    self.vendorOnlyCheck.frame = NSMakeRect(430, 654, 180, 20);
-    self.vendorOnlyCheck.state = NSControlStateValueOn;
-    [cv addSubview:self.vendorOnlyCheck];
-
-    [cv addSubview:[self label:@"DPI 段數（共 7 段，留空 = 未設定）：" x:12 w:300 y:616 size:12 bold:NO]];
     for (NSInteger i = 0; i < [self.mapper stepCount]; i++) {
-        NSTextField *f = [[NSTextField alloc] initWithFrame:NSMakeRect(236 + i * 52, 612, 46, 24)];
+        NSTextField *f = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 50, 24)];
         f.alignment = NSTextAlignmentCenter;
+        f.font = [NSFont systemFontOfSize:12 weight:NSFontWeightSemibold];
         f.placeholderString = [NSString stringWithFormat:@"%ld", (long)(i + 1)];
         NSNumber *v = [self.mapper presetForStep:i];
         if (v) f.stringValue = v.stringValue;
         f.tag = i;
         f.target = self;
         f.action = @selector(presetFieldChanged:);
+        f.wantsLayer = YES;
         [cv addSubview:f];
         [self.presetFields addObject:f];
     }
 
-    [cv addSubview:[self label:@"實測 DPI：移動" x:12 w:130 y:578 size:12 bold:NO]];
-    self.distanceField = [[NSTextField alloc] initWithFrame:NSMakeRect(142, 574, 50, 24)];
+    // Mode Row
+    self.advancedCheck = [NSButton checkboxWithTitle:@"進階模式（量測 · 封包 · 記錄）" target:self action:@selector(toggleAdvanced:)];
+    self.advancedCheck.font = [NSFont systemFontOfSize:11];
+    self.advancedCheck.state = self.advancedMode ? NSControlStateValueOn : NSControlStateValueOff;
+    [cv addSubview:self.advancedCheck];
+
+    self.testHudBtn = [self button:@"測試 HUD" action:@selector(testHUD:) x:0 w:80 y:0];
+    self.testHudBtn.font = [NSFont systemFontOfSize:11];
+    [cv addSubview:self.testHudBtn];
+
+    // Advanced Section - Operations
+    NSButton *startBtn = [self button:@"開始監看" action:@selector(startMonitoring:) x:0 w:72 y:0];
+    NSButton *stopBtn = [self button:@"停止" action:@selector(stopMonitoring:) x:0 w:50 y:0];
+    NSButton *reconnectBtn = [self button:@"重連原廠" action:@selector(redetectPressed:) x:0 w:76 y:0];
+    NSButton *readBtn = [self button:@"讀取原廠表" action:@selector(readVendorTable:) x:0 w:86 y:0];
+    NSButton *rescanBtn = [self button:@"重新掃描" action:@selector(rescan:) x:0 w:74 y:0];
+    startBtn.font = stopBtn.font = reconnectBtn.font = readBtn.font = rescanBtn.font = [NSFont systemFontOfSize:11];
+    [cv addSubview:startBtn]; [cv addSubview:stopBtn]; [cv addSubview:reconnectBtn]; [cv addSubview:readBtn]; [cv addSubview:rescanBtn];
+    self.monitorRow = @[startBtn, stopBtn, reconnectBtn, readBtn, rescanBtn];
+
+    // Advanced Section - Log Tools
+    NSButton *clearBtn = [self button:@"清除記錄" action:@selector(clearLog:) x:0 w:72 y:0];
+    NSButton *folderBtn = [self button:@"開啟記錄檔" action:@selector(openLogFolder:) x:0 w:86 y:0];
+    clearBtn.font = folderBtn.font = [NSFont systemFontOfSize:11];
+    [cv addSubview:clearBtn]; [cv addSubview:folderBtn];
+    self.logClearRow = @[clearBtn, folderBtn];
+
+    self.vendorOnlyCheck = [NSButton checkboxWithTitle:@"只記錄廠商通道" target:nil action:nil];
+    self.vendorOnlyCheck.toolTip = @"只記錄廠商通道 (Report ID 6)";
+    self.vendorOnlyCheck.font = [NSFont systemFontOfSize:11];
+    self.vendorOnlyCheck.state = NSControlStateValueOn;
+    [cv addSubview:self.vendorOnlyCheck];
+
+    // Advanced Section - Calibration
+    self.measureCaption = [self label:@"實測：移動" x:0 w:68 y:0 size:11 bold:NO];
+    [cv addSubview:self.measureCaption];
+
+    self.distanceField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 36, 22)];
     self.distanceField.stringValue = @"10";
+    self.distanceField.alignment = NSTextAlignmentCenter;
+    self.distanceField.font = [NSFont systemFontOfSize:11];
     [cv addSubview:self.distanceField];
-    [cv addSubview:[self label:@"cm" x:196 w:24 y:578 size:12 bold:NO]];
-    [cv addSubview:[self button:@"開始量測" action:@selector(startMeasure:) x:226 w:90 y:572]];
-    [cv addSubview:[self button:@"套用到目前段" action:@selector(applyMeasure:) x:322 w:130 y:572]];
-    self.measureLabel = [self label:@"（按 DPI 鍵選段 → 沿尺水平移動）" x:462 w:150 y:578 size:11 bold:NO];
+
+    self.cmLabel = [self label:@"cm" x:0 w:20 y:0 size:11 bold:NO];
+    [cv addSubview:self.cmLabel];
+
+    NSButton *measureBtn = [self button:@"開始量測" action:@selector(startMeasure:) x:0 w:74 y:0];
+    NSButton *applyBtn = [self button:@"套用至目前段" action:@selector(applyMeasure:) x:0 w:96 y:0];
+    measureBtn.font = applyBtn.font = [NSFont systemFontOfSize:11];
+    [cv addSubview:measureBtn]; [cv addSubview:applyBtn];
+
+    self.measureLabel = [self label:@"（按 DPI 鍵選段 → 沿尺水平移動）" x:0 w:130 y:0 size:10 bold:NO];
     self.measureLabel.textColor = NSColor.secondaryLabelColor;
     [cv addSubview:self.measureLabel];
 
-    [cv addSubview:[self label:@"自訂封包 (hex)：" x:12 w:110 y:540 size:12 bold:NO]];
-    self.hexField = [[NSTextField alloc] initWithFrame:NSMakeRect(126, 536, 360, 24)];
-    self.hexField.placeholderString = @"06 00 00 …（第一 byte 是 Report ID）";
-    [cv addSubview:self.hexField];
-    [cv addSubview:[self button:@"送出" action:@selector(sendHex:) x:494 w:82 y:534]];
+    self.measureRow = @[self.measureCaption, self.distanceField, self.cmLabel, measureBtn, applyBtn, self.measureLabel];
 
-    NSScrollView *sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(12, 12, 596, 512)];
+    // Advanced Section - Hex Sender
+    self.hexLabel = [self label:@"自訂封包 (hex)：" x:0 w:95 y:0 size:11 bold:NO];
+    [cv addSubview:self.hexLabel];
+
+    self.hexField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 275, 22)];
+    self.hexField.placeholderString = @"06 00 00 …（第一 byte 是 Report ID）";
+    self.hexField.font = [NSFont monospacedSystemFontOfSize:10 weight:NSFontWeightRegular];
+    [cv addSubview:self.hexField];
+
+    NSButton *sendBtn = [self button:@"送出" action:@selector(sendHex:) x:0 w:54 y:0];
+    sendBtn.font = [NSFont systemFontOfSize:11];
+    [cv addSubview:sendBtn];
+
+    self.hexRow = @[self.hexLabel, self.hexField, sendBtn];
+
+    // Advanced Section - Live Log
+    NSScrollView *sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(16, 14, 448, 220)];
     sv.hasVerticalScroller = YES;
     sv.borderType = NSBezelBorder;
-    sv.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    sv.autoresizingMask = NSViewNotSizable;
     NSTextView *tv = [[NSTextView alloc] initWithFrame:sv.bounds];
     tv.editable = NO;
-    tv.font = [NSFont monospacedSystemFontOfSize:11 weight:NSFontWeightRegular];
-    tv.autoresizingMask = NSViewWidthSizable;
+    tv.font = [NSFont monospacedSystemFontOfSize:10 weight:NSFontWeightRegular];
+    tv.autoresizingMask = NSViewNotSizable;
     tv.verticallyResizable = YES;
     tv.horizontallyResizable = NO;
     tv.textContainer.widthTracksTextView = YES;
     tv.maxSize = NSMakeSize(FLT_MAX, FLT_MAX);
     sv.documentView = tv;
     self.logView = tv;
+    self.logScroll = sv;
     [cv addSubview:sv];
 
-    [self.window makeKeyAndOrderFront:nil];
-    [NSApp activateIgnoringOtherApps:YES];
+    [self.advancedViews addObjectsFromArray:self.monitorRow];
+    [self.advancedViews addObjectsFromArray:self.logClearRow];
+    [self.advancedViews addObject:self.vendorOnlyCheck];
+    [self.advancedViews addObjectsFromArray:self.measureRow];
+    [self.advancedViews addObjectsFromArray:self.hexRow];
+    [self.advancedViews addObject:self.logScroll];
+
+    [self applyAdvancedMode:NO];
+}
+
+- (void)placeRow:(NSArray *)views y:(CGFloat)y widths:(NSArray<NSNumber *> *)widths gap:(CGFloat)gap left:(CGFloat)left {
+    CGFloat x = left;
+    for (NSUInteger i = 0; i < [views count] && i < [widths count]; i++) {
+        NSView *v = (NSView *)[views objectAtIndex:i];
+        NSNumber *w = (NSNumber *)[widths objectAtIndex:i];
+        NSRect f = v.frame;
+        f.origin.x = x;
+        f.size.width = [w doubleValue];
+        if ([v isKindOfClass:[NSTextField class]] && !((NSTextField *)v).editable) {
+            f.origin.y = y + 4.0;
+            f.size.height = 18.0;
+        } else if ([v isKindOfClass:[NSButton class]] && ((NSButton *)v).bezelStyle == NSBezelStyleRounded) {
+            f.origin.y = y;
+            f.size.height = 26.0;
+        } else if ([v isKindOfClass:[NSTextField class]]) {
+            f.origin.y = y + 2.0;
+            f.size.height = 22.0;
+        } else {
+            f.origin.y = y + 4.0;
+            f.size.height = 20.0;
+        }
+        v.frame = f;
+        x += [w doubleValue] + gap;
+    }
+}
+
+- (void)layoutContent {
+    CGFloat y = self.window.contentView.bounds.size.height - 12.0;
+
+    // Header bar
+    y -= 22.0;
+    self.titleLabel.frame = NSMakeRect(16.0, y + 2.0, 75.0, 18.0);
+    self.badgeLabel.frame = NSMakeRect(94.0, y + 2.0, 205.0, 18.0);
+    self.pinCheck.frame = NSMakeRect(304.0, y + 1.0, 96.0, 20.0);
+    self.quitBtn.frame = NSMakeRect(408.0, y - 1.0, 56.0, 24.0);
+
+    y -= 8.0;
+    self.headerSeparator.frame = NSMakeRect(16.0, y, 448.0, 1.0);
+
+    // Status Section
+    y -= 22.0;
+    self.accessLabel.frame = NSMakeRect(16.0, y, 448.0, 18.0);
+
+    BOOL hasPermWarning = ([self.watcher accessState] != HIDAccessGranted);
+    if (hasPermWarning) {
+        y -= 28.0;
+        for (NSView *v in self.permRow) v.hidden = NO;
+        [self placeRow:self.permRow y:y widths:@[@140, @110] gap:8 left:16];
+    } else {
+        for (NSView *v in self.permRow) v.hidden = YES;
+    }
+
+    y -= 20.0;
+    self.deviceLabel.frame = NSMakeRect(16.0, y, 448.0, 16.0);
+
+    // Presets
+    y -= 22.0;
+    self.presetsLabel.frame = NSMakeRect(16.0, y, 448.0, 16.0);
+    y -= 26.0;
+    CGFloat presetStartX = 47.0; // (448 - 386) / 2 + 16
+    for (NSUInteger i = 0; i < self.presetFields.count; i++) {
+        NSTextField *f = self.presetFields[i];
+        f.frame = NSMakeRect(presetStartX + i * 56.0, y, 50.0, 24.0);
+    }
+
+    // Mode Toggle row
+    y -= 30.0;
+    self.advancedCheck.frame = NSMakeRect(16.0, y + 2.0, 230.0, 20.0);
+    self.testHudBtn.frame = NSMakeRect(384.0, y, 80.0, 24.0);
+
+    if (!self.advancedMode) {
+        return;
+    }
+
+    // Advanced Section
+    y -= 32.0;
+    [self placeRow:self.monitorRow y:y widths:@[@72, @50, @76, @86, @74] gap:6 left:16];
+
+    y -= 28.0;
+    [self placeRow:self.logClearRow y:y widths:@[@72, @86] gap:6 left:16];
+    self.vendorOnlyCheck.frame = NSMakeRect(186.0, y + 3.0, 160.0, 20.0);
+
+    y -= 28.0;
+    [self placeRow:self.measureRow y:y widths:@[@68, @36, @20, @74, @96, @130] gap:6 left:16];
+
+    y -= 28.0;
+    [self placeRow:self.hexRow y:y widths:@[@95, @275, @54] gap:6 left:16];
+
+    y -= 8.0;
+    CGFloat logH = MAX(160.0, y - 14.0);
+    self.logScroll.frame = NSMakeRect(16.0, 14.0, 448.0, logH);
+}
+
+- (void)applyAdvancedMode:(BOOL)animate {
+    [NSUserDefaults.standardUserDefaults setBool:self.advancedMode forKey:@"DPIPeek.advancedMode"];
+    NSControlStateValue st = self.advancedMode ? NSControlStateValueOn : NSControlStateValueOff;
+    self.advancedCheck.state = st;
+    for (NSView *v in self.advancedViews) v.hidden = !self.advancedMode;
+
+    BOOL hasPermWarning = ([self.watcher accessState] != HIDAccessGranted);
+    CGFloat targetH = self.advancedMode ? 660.0 : (hasPermWarning ? 240.0 : 205.0);
+
+    NSRect curFrame = self.window.frame;
+    CGFloat curTop = NSMaxY(curFrame);
+    NSRect newFrame = NSMakeRect(curFrame.origin.x, curTop - targetH, 480.0, targetH);
+    [self.window setFrame:newFrame display:YES animate:animate];
+
+    [self layoutContent];
+}
+
+- (void)toggleAdvanced:(id)sender {
+    (void)sender;
+    self.advancedMode = !self.advancedMode;
+    [self applyAdvancedMode:YES];
 }
 
 - (void)refreshStatus {
@@ -403,29 +738,46 @@ static NSString *timeString(NSDate *d) {
     NSColor *color = NSColor.labelColor;
     switch (st) {
         case HIDAccessGranted: text = @"權限狀態：已授予「輸入監控」✔"; break;
-        case HIDAccessDenied:  text = @"權限狀態：被拒絕 ✘（系統設定 → 隱私權與安全性 → 輸入監控 → 勾選 DPIPeek，再重新開啟 App）";
+        case HIDAccessDenied:  text = @"權限狀態：被拒絕 ✘（請到系統設定開啟）";
                                color = NSColor.systemRedColor; break;
-        default:               text = @"權限狀態：尚未決定（按「要求輸入監控權限」）"; break;
+        default:               text = @"權限狀態：尚未決定（按要求權限）"; break;
     }
     self.accessLabel.stringValue = text;
     self.accessLabel.textColor = color;
 
-    if (self.watcher.isMonitoring) {
+    // Update connection status and badge
+    NSString *modeText = @"未連線";
+    NSString *dpiText = (self.mapper.currentStep >= 0) ? [self.mapper hudTitleForStep:self.mapper.currentStep] : @"";
+    if (self.vendor.isReady) {
+        modeText = [NSString stringWithFormat:@"2.4G · %@", dpiText.length ? dpiText : @"4000 DPI"];
+        self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：%@ ｜ 原廠 2.4G 通道 (0xD4)", self.vendor.deviceName];
+    } else if (self.watcher.isMonitoring) {
         NSArray *ifs = self.watcher.interfaces;
-        NSMutableArray *names = [NSMutableArray array];
-        for (HIDInterfaceInfo *i in ifs) [names addObject:[NSString stringWithFormat:@"#%lu %@", (unsigned long)i.index, i.product]];
-        NSString *extra = self.vendor.isReady
-            ? [NSString stringWithFormat:@"  ｜ 原廠通道：%s（DPI 0x%02X）",
-               self.vendor.deviceName.UTF8String, self.vendor.dpiOpcode]
-            : @"  ｜ 原廠通道：未連上";
-        self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：監看中 — %@%@",
-                                        names.count ? [names componentsJoinedByString:@", "] : @"(等待滑鼠連線)", extra];
+        modeText = [NSString stringWithFormat:@"藍牙 · %@", dpiText.length ? dpiText : @"已連線"];
+        self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：藍牙監看中 (%lu 介面)", (unsigned long)ifs.count];
     } else {
-        self.deviceLabel.stringValue = @"裝置：未監看";
+        self.deviceLabel.stringValue = @"裝置：未連線";
     }
+    self.badgeLabel.stringValue = modeText;
+
+    // Highlight current active DPI field with border
+    NSInteger active = self.mapper.currentStep;
+    for (NSInteger i = 0; i < (NSInteger)self.presetFields.count; i++) {
+        NSTextField *f = self.presetFields[i];
+        if (i == active) {
+            f.layer.borderWidth = 2.0;
+            f.layer.borderColor = [NSColor systemBlueColor].CGColor;
+            f.layer.cornerRadius = 4.0;
+        } else {
+            f.layer.borderWidth = 0.0;
+            f.layer.borderColor = nil;
+        }
+    }
+
+    [self layoutContent];
 }
 
-// MARK: logging
+// MARK: - logging
 
 - (void)openLogFile {
     NSString *base = [[NSBundle mainBundle].bundlePath stringByDeletingLastPathComponent];
@@ -461,7 +813,7 @@ static NSString *timeString(NSDate *d) {
     if (NSThread.isMainThread) work(); else dispatch_async(dispatch_get_main_queue(), work);
 }
 
-// MARK: vendor API
+// MARK: - vendor API
 
 - (void)connectVendorChannel {
     __weak AppDelegate *weakSelf = self;
@@ -541,7 +893,7 @@ static NSString *timeString(NSDate *d) {
     [self handleVendorDPIWithCount:count active:active values:values];
 }
 
-// MARK: HID handling
+// MARK: - HID handling
 
 - (void)handleReport:(HIDInterfaceInfo *)iface reportID:(uint32_t)reportID payload:(NSData *)payload when:(NSDate *)when {
     NSData *copy = [payload copy];
@@ -598,12 +950,11 @@ static NSString *timeString(NSDate *d) {
     });
 }
 
-// MARK: actions
+// MARK: - actions
 
 - (void)showWindow:(id)sender {
     (void)sender;
-    [self.window makeKeyAndOrderFront:nil];
-    [NSApp activateIgnoringOtherApps:YES];
+    [self showPanel];
 }
 
 - (void)requestAccess:(id)sender {
@@ -622,7 +973,7 @@ static NSString *timeString(NSDate *d) {
 
 - (void)startMonitoring:(id)sender {
     (void)sender;
-    if (self.watcher.isMonitoring) {          // already running (launch path + permission timer)
+    if (self.watcher.isMonitoring) {
         [self refreshStatus];
         return;
     }
@@ -667,6 +1018,7 @@ static NSString *timeString(NSDate *d) {
     [self.mapper setPreset:value forStep:step];
     [self.mapper save];
     [self appendLog:[NSString stringWithFormat:@"第 %ld 段設為 %@", (long)(step + 1), value ? value : @"（未設定）"]];
+    [self refreshStatus];
 }
 
 - (void)startMeasure:(id)sender {
@@ -706,6 +1058,7 @@ static NSString *timeString(NSDate *d) {
     [self appendLog:[NSString stringWithFormat:@"量測結果：%.1f counts / %.2f in = %.0f DPI → 第 %ld 段取 %ld",
                      self.measureCounts, inches, dpi, (long)(step + 1), (long)rounded]];
     self.measureCounts = 0;
+    [self refreshStatus];
 }
 
 - (void)testHUD:(id)sender {
