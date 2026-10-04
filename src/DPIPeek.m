@@ -17,6 +17,7 @@
 #import "HIDWatcher.h"
 #import "DPIMapper.h"
 #import "VendorChannel.h"
+#import "BLEBatteryReader.h"
 
 // MARK: - helpers
 
@@ -204,6 +205,7 @@ static NSString *timeString(NSDate *d) {
 @property (nonatomic) NSTimeInterval lastVendorTime;
 @property (nonatomic) double measuredDPI;
 @property (nonatomic, strong) id<NSObject> activity;
+@property (nonatomic, strong) BLEBatteryReader *bleBattery;
 @end
 
 @implementation AppDelegate
@@ -239,6 +241,13 @@ static NSString *timeString(NSDate *d) {
     [self openLogFile];
     [self buildWindow];
     [self applyTheme:self.currentTheme];
+
+    self.bleBattery = [BLEBatteryReader new];
+    self.bleBattery.batteryUpdateHandler = ^(int percent) {
+        [weakSelf refreshStatus];
+    };
+    [self.bleBattery start];
+
     [self refreshStatus];
 
     [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(permissionTick:) userInfo:nil repeats:YES];
@@ -314,6 +323,7 @@ static NSString *timeString(NSDate *d) {
     (void)note;
     [self.watcher stopMonitoring];
     [self.vendor close];
+    [self.bleBattery stop];
     if (self.activity) [NSProcessInfo.processInfo endActivity:self.activity];
     [self.mapper save];
     [self.logFile closeFile];
@@ -904,11 +914,22 @@ static NSString *timeString(NSDate *d) {
             }
         }
         if (hasBLE) {
-            modeText = [NSString stringWithFormat:@"藍牙 · %@", dpiText.length ? dpiText : @"已連線"];
-            self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：藍牙監看中 (%lu 介面) ｜ 藍牙無廣播電量", (unsigned long)ifs.count];
+            int batt = self.bleBattery.batteryPercent;
+            NSString *battBadge = @"";
+            if (batt > 0 && batt <= 100) {
+                battBadge = [NSString stringWithFormat:@" · %s %d%%", (batt <= 20 ? "🪫" : "🔋"), batt];
+                self.statusItem.button.title = [NSString stringWithFormat:@"DPI %d%%", batt];
+            } else {
+                self.statusItem.button.title = @"DPI";
+            }
+            modeText = [NSString stringWithFormat:@"藍牙 · %@%@", dpiText.length ? dpiText : @"已連線", battBadge];
+            self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：藍牙監看中 (%lu 介面)%@",
+                                            (unsigned long)ifs.count,
+                                            (batt > 0 ? [NSString stringWithFormat:@" ｜ 電量：%d%%", batt] : @"")];
             self.presetsLabel.stringValue = @"目前 DPI 段數（藍牙模式請按滑鼠實體鍵切換）：";
-            self.statusItem.button.toolTip = [NSString stringWithFormat:@"DPI Peek — HP Professor 1 (藍牙 · %@)",
-                                              dpiText.length ? dpiText : @"已連線"];
+            self.statusItem.button.toolTip = [NSString stringWithFormat:@"DPI Peek — HP Professor 1 (藍牙 · %@%@)",
+                                              dpiText.length ? dpiText : @"已連線",
+                                              (batt > 0 ? [NSString stringWithFormat:@" · 電量 %d%%", batt] : @"")];
         } else {
             modeText = @"未連線";
             self.deviceLabel.stringValue = @"裝置：等待滑鼠連線…";

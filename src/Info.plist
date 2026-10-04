@@ -24,6 +24,8 @@
 	<string>11.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>讀取 HP Professor 1 滑鼠的藍牙電池電量。</string>
 	<key>NSAppSleepDisabled</key>
 	<true/>
 	<key>NSHighResolutionCapable</key>

@@ -10,8 +10,8 @@ mkdir -p build "$CACHE"
 echo "==> compiling DPIPeek binary"
 clang -fobjc-arc -fmodules-cache-path="$CACHE" -O2 -Wall \
     -o build/DPIPeek \
-    src/DPIPeek.m src/HIDWatcher.m src/DPIMapper.m src/VendorChannel.m \
-    -framework Cocoa -framework IOKit
+    src/DPIPeek.m src/HIDWatcher.m src/DPIMapper.m src/VendorChannel.m src/BLEBatteryReader.m \
+    -framework Cocoa -framework IOKit -framework CoreBluetooth
 
 echo "==> compiling probe CLI"
 clang -fobjc-arc -fmodules-cache-path="$CACHE" -O2 \
