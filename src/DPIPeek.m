@@ -528,7 +528,7 @@ static NSString *timeString(NSDate *d) {
     self.permRow = @[askBtn, setBtn];
 
     // DPI Segment Control: 7 Segments with real values
-    self.presetsLabel = [self label:@"目前 DPI 段數（請按滑鼠實體鍵切換）：" x:14 w:352 y:0 size:11 bold:YES];
+    self.presetsLabel = [self label:@"DPI 段數（2.4G 可點擊直切；藍牙為狀態顯示）：" x:14 w:352 y:0 size:10.5 bold:YES];
     [cv addSubview:self.presetsLabel];
 
     self.dpiSegments = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(14, 0, 352, 26)];
@@ -814,21 +814,40 @@ static NSString *timeString(NSDate *d) {
 
 - (void)dpiSegmentClicked:(NSSegmentedControl *)sender {
     NSInteger clickedIndex = sender.selectedSegment;
+    [self switchToDPIIndex:clickedIndex];
+}
 
-    // Keep the UI strictly synchronized with the true hardware state
-    if (self.mapper.currentStep >= 0 && self.mapper.currentStep < self.dpiSegments.segmentCount) {
-        self.dpiSegments.selectedSegment = self.mapper.currentStep;
+- (void)switchToDPIIndex:(NSInteger)index {
+    if (index < 0 || index >= [self.mapper stepCount]) return;
+
+    NSString *title = [self.mapper hudTitleForStep:index];
+    NSString *sub = [self.mapper hudSubtitleForStep:index];
+
+    if (self.vendor.isReady) {
+        // 2.4G Mode: Mouse hardware supports 0x54 to set the optical sensor resolution!
+        BOOL ok = [self.vendor setActiveDPIIndex:(int)index];
+        if (ok) {
+            self.mapper.currentStep = index;
+            self.dpiSegments.selectedSegment = index;
+            [HUDWindow.sharedHUD showTitle:title subtitle:sub];
+            [self appendLog:[NSString stringWithFormat:@"%@ [2.4G 軟體切換] 成功切換至第 %ld 段 (%@)",
+                             timeString(NSDate.date), (long)(index + 1), title]];
+        } else {
+            [self appendLog:[NSString stringWithFormat:@"%@ [2.4G 切換失敗]", timeString(NSDate.date)]];
+        }
+    } else {
+        // Bluetooth Mode: The hardware BLE firmware does not accept host commands
+        if (self.mapper.currentStep >= 0 && self.mapper.currentStep < self.dpiSegments.segmentCount) {
+            self.dpiSegments.selectedSegment = self.mapper.currentStep;
+        }
+        NSString *curDPI = (self.mapper.currentStep >= 0) ? [self.mapper hudTitleForStep:self.mapper.currentStep] : @"?";
+        [HUDWindow.sharedHUD showTitle:curDPI
+                              subtitle:@"藍牙模式限制：請按滑鼠實體 DPI 鍵切換"];
+        [self appendLog:[NSString stringWithFormat:@"%@ 提示：藍牙模式僅支援滑鼠單向通知，請改插 2.4G 接收器即可軟體直切",
+                         timeString(NSDate.date)]];
     }
 
-    NSString *clickedDPI = [self.mapper hudTitleForStep:clickedIndex];
-    NSString *curDPI = (self.mapper.currentStep >= 0) ? [self.mapper hudTitleForStep:self.mapper.currentStep] : @"?";
-
-    // Show HUD to remind user that this mouse requires the physical DPI button to alter hardware sensor
-    [HUDWindow.sharedHUD showTitle:curDPI
-                          subtitle:[NSString stringWithFormat:@"點選了 %@ · 請按滑鼠實體 DPI 鍵切換", clickedDPI]];
-
-    [self appendLog:[NSString stringWithFormat:@"%@ 提示：此滑鼠硬體韌體僅支援實體鍵切換感測器，目前為 %@",
-                     timeString(NSDate.date), curDPI]];
+    [self refreshStatus];
 }
 
 - (void)refreshStatus {

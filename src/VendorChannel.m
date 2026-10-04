@@ -200,11 +200,22 @@ static uint8_t checksum7(const uint8_t *b) {
 
 - (BOOL)setActiveDPIIndex:(int)index {
     if (!self.device) return NO;
+    if (index < 0 || index >= 7) return NO;
     uint8_t cmd[64] = {0}, reply[64] = {0};
     cmd[0] = 0x54; // SET opcode for 0xD4 (GET = SET | 0x80)
     cmd[1] = 0x00;
     cmd[2] = (uint8_t)index;
     cmd[3] = 0x07; // 7 levels
+
+    // Fill both profiles of the 7-level DPI table so the mouse sensor has valid values
+    static const uint16_t kDefaultDPIs[7] = {800, 1000, 1200, 1600, 2400, 3200, 4000};
+    for (int i = 0; i < 7; i++) {
+        cmd[8 + i * 2] = (uint8_t)(kDefaultDPIs[i] & 0xFF);
+        cmd[8 + i * 2 + 1] = (uint8_t)((kDefaultDPIs[i] >> 8) & 0xFF);
+        cmd[24 + i * 2] = (uint8_t)(kDefaultDPIs[i] & 0xFF);
+        cmd[24 + i * 2 + 1] = (uint8_t)((kDefaultDPIs[i] >> 8) & 0xFF);
+    }
+
     [self sendCommand:cmd reply:reply];
     self.lastActive = index;
     return YES;
