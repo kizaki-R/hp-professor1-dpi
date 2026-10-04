@@ -151,6 +151,7 @@ static NSString *timeString(NSDate *d) {
 @interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
 @property (nonatomic, strong) NSStatusItem *statusItem;
 @property (nonatomic, strong) MenuBarPanel *window;
+@property (nonatomic, strong) NSView *container;
 @property (nonatomic, strong) NSVisualEffectView *effectView;
 @property (nonatomic, strong) NSTextField *titleLabel;
 @property (nonatomic, strong) NSTextField *badgeLabel;
@@ -159,6 +160,7 @@ static NSString *timeString(NSDate *d) {
 @property (nonatomic, strong) NSBox *headerSeparator;
 @property (nonatomic) BOOL pinned;
 @property (nonatomic) NSTimeInterval lastCloseTime;
+@property (nonatomic) NSInteger currentTheme; // 0=Auto, 1=Light, 2=Dark
 
 @property (nonatomic, strong) NSTextView *logView;
 @property (nonatomic, strong) NSScrollView *logScroll;
@@ -167,8 +169,12 @@ static NSString *timeString(NSDate *d) {
 @property (nonatomic, strong) NSButton *vendorOnlyCheck;
 @property (nonatomic, strong) NSSegmentedControl *dpiSegments;
 @property (nonatomic, strong) NSTextField *presetsLabel;
+
+@property (nonatomic, strong) NSTextField *themeLabel;
+@property (nonatomic, strong) NSSegmentedControl *themeSegments;
 @property (nonatomic, strong) NSButton *advancedCheck;
 @property (nonatomic, strong) NSButton *testHudBtn;
+
 @property (nonatomic, strong) NSArray *permRow;
 @property (nonatomic, strong) NSArray *monitorRow;
 @property (nonatomic, strong) NSArray *vendorRow;
@@ -213,6 +219,7 @@ static NSString *timeString(NSDate *d) {
     self.advancedViews = [NSMutableArray array];
     self.advancedMode = [NSUserDefaults.standardUserDefaults boolForKey:@"DPIPeek.advancedMode"];
     self.pinned = [NSUserDefaults.standardUserDefaults boolForKey:@"DPIPeek.pinned"];
+    self.currentTheme = [NSUserDefaults.standardUserDefaults integerForKey:@"DPIPeek.theme"]; // 0=Auto, 1=Light, 2=Dark
 
     __weak AppDelegate *weakSelf = self;
     self.watcher.reportHandler = ^(HIDInterfaceInfo *iface, uint32_t reportID, NSData *payload, NSDate *when) {
@@ -228,6 +235,7 @@ static NSString *timeString(NSDate *d) {
 
     [self openLogFile];
     [self buildWindow];
+    [self applyTheme:self.currentTheme];
     [self refreshStatus];
 
     [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(permissionTick:) userInfo:nil repeats:YES];
@@ -258,7 +266,6 @@ static NSString *timeString(NSDate *d) {
         }
     }
 
-    // Automatically drop down the panel on launch
     dispatch_async(dispatch_get_main_queue(), ^{
         [self showPanel];
     });
@@ -334,6 +341,19 @@ static NSString *timeString(NSDate *d) {
     [menu addItemWithTitle:(self.window.isVisible ? @"隱藏面板" : @"顯示面板")
                     action:@selector(togglePanel) keyEquivalent:@""];
     [menu addItem:NSMenuItem.separatorItem];
+
+    NSMenuItem *themeItem = [menu addItemWithTitle:@"外觀主題" action:nil keyEquivalent:@""];
+    NSMenu *themeMenu = [NSMenu new];
+    NSMenuItem *autoItem = [themeMenu addItemWithTitle:@"跟隨系統 (Auto)" action:@selector(setThemeAuto:) keyEquivalent:@""];
+    NSMenuItem *lightItem = [themeMenu addItemWithTitle:@"淺色模式 (Light)" action:@selector(setThemeLight:) keyEquivalent:@""];
+    NSMenuItem *darkItem = [themeMenu addItemWithTitle:@"深色模式 (Dark)" action:@selector(setThemeDark:) keyEquivalent:@""];
+    autoItem.target = lightItem.target = darkItem.target = self;
+    autoItem.state = (self.currentTheme == 0) ? NSControlStateValueOn : NSControlStateValueOff;
+    lightItem.state = (self.currentTheme == 1) ? NSControlStateValueOn : NSControlStateValueOff;
+    darkItem.state = (self.currentTheme == 2) ? NSControlStateValueOn : NSControlStateValueOff;
+    themeItem.submenu = themeMenu;
+
+    [menu addItem:NSMenuItem.separatorItem];
     [menu addItemWithTitle:@"測試 HUD" action:@selector(testHUD:) keyEquivalent:@""];
     [menu addItemWithTitle:@"輸入監控設定…" action:@selector(openPrivacySettings:) keyEquivalent:@""];
     [menu addItem:NSMenuItem.separatorItem];
@@ -343,6 +363,10 @@ static NSString *timeString(NSDate *d) {
     [self.statusItem popUpStatusItemMenu:menu];
 #pragma clang diagnostic pop
 }
+
+- (void)setThemeAuto:(id)sender { [self applyTheme:0]; }
+- (void)setThemeLight:(id)sender { [self applyTheme:1]; }
+- (void)setThemeDark:(id)sender { [self applyTheme:2]; }
 
 - (void)togglePanel {
     if (self.window.isVisible) {
@@ -425,13 +449,14 @@ static NSString *timeString(NSDate *d) {
     NSTextField *l = [NSTextField labelWithString:text];
     l.frame = NSMakeRect(x, y, w, 18);
     l.font = bold ? [NSFont boldSystemFontOfSize:size] : [NSFont systemFontOfSize:size];
+    l.textColor = [NSColor labelColor];
     return l;
 }
 
 // MARK: - Panel UI Construction (Width = 380px)
 
 - (void)buildWindow {
-    NSRect frame = NSMakeRect(0, 0, 380.0, 205.0);
+    NSRect frame = NSMakeRect(0, 0, 380.0, 235.0);
     self.window = [[MenuBarPanel alloc] initWithContentRect:frame
                                                   styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel
                                                     backing:NSBackingStoreBuffered
@@ -445,25 +470,32 @@ static NSString *timeString(NSDate *d) {
     self.window.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
                                      NSWindowCollectionBehaviorFullScreenAuxiliary;
 
-    // Layer-backed container view: clips rounded corners cleanly with NO white/gray borders
-    NSView *container = [[NSView alloc] initWithFrame:self.window.contentView.bounds];
-    container.wantsLayer = YES;
-    container.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.12 alpha:0.96].CGColor;
-    container.layer.cornerRadius = 16.0;
-    container.layer.masksToBounds = YES;
-    container.layer.borderWidth = 1.0;
-    container.layer.borderColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.18].CGColor;
-    container.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    self.window.contentView = container;
-    NSView *cv = container;
+    // Layer-masked container: 100% clean rounded corners with NO square border artifacts
+    self.container = [[NSView alloc] initWithFrame:self.window.contentView.bounds];
+    self.container.wantsLayer = YES;
+    self.container.layer.cornerRadius = 14.0;
+    self.container.layer.masksToBounds = YES;
+    self.container.layer.borderWidth = 1.0;
+    self.container.layer.borderColor = [NSColor separatorColor].CGColor;
+    self.container.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    self.window.contentView = self.container;
+
+    // Native frosted glass background view: adapts to Light & Dark modes automatically
+    self.effectView = [[NSVisualEffectView alloc] initWithFrame:self.container.bounds];
+    self.effectView.material = NSVisualEffectMaterialPopover;
+    self.effectView.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+    self.effectView.state = NSVisualEffectStateActive;
+    self.effectView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [self.container addSubview:self.effectView positioned:NSWindowBelow relativeTo:nil];
+
+    NSView *cv = self.container;
 
     // Header Bar
-    self.titleLabel = [self label:@"DPI Peek" x:14 w:65 y:0 size:13 bold:YES];
-    self.titleLabel.textColor = [NSColor whiteColor];
+    self.titleLabel = [self label:@"DPI Peek" x:14 w:68 y:0 size:13 bold:YES];
     [cv addSubview:self.titleLabel];
 
-    self.badgeLabel = [self label:@"2.4G 4000 DPI" x:82 w:135 y:0 size:10 bold:NO];
-    self.badgeLabel.textColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.75];
+    self.badgeLabel = [self label:@"2.4G 4000 DPI" x:84 w:136 y:0 size:10 bold:NO];
+    self.badgeLabel.textColor = [NSColor secondaryLabelColor];
     [cv addSubview:self.badgeLabel];
 
     self.pinCheck = [NSButton checkboxWithTitle:@"📌 釘選" target:self action:@selector(togglePin:)];
@@ -485,7 +517,7 @@ static NSString *timeString(NSDate *d) {
     [cv addSubview:self.accessLabel];
 
     self.deviceLabel = [self label:@"裝置：尚未監看" x:14 w:352 y:0 size:10 bold:NO];
-    self.deviceLabel.textColor = NSColor.secondaryLabelColor;
+    self.deviceLabel.textColor = [NSColor secondaryLabelColor];
     [cv addSubview:self.deviceLabel];
 
     NSButton *askBtn = [self button:@"要求輸入監控權限" action:@selector(requestAccess:) x:0 w:130 y:0];
@@ -495,7 +527,7 @@ static NSString *timeString(NSDate *d) {
     [cv addSubview:setBtn];
     self.permRow = @[askBtn, setBtn];
 
-    // DPI Segment Control: 7 Clickable Segments (Click to switch DPI instantly!)
+    // DPI Segment Control: 7 Segments with real values
     self.presetsLabel = [self label:@"目前 DPI 段數（請按滑鼠實體鍵切換）：" x:14 w:352 y:0 size:11 bold:YES];
     [cv addSubview:self.presetsLabel];
 
@@ -510,22 +542,39 @@ static NSString *timeString(NSDate *d) {
         NSNumber *v = [self.mapper presetForStep:i];
         NSString *lbl = v ? [NSString stringWithFormat:@"%@", v] : [NSString stringWithFormat:@"P%ld", (long)(i + 1)];
         [self.dpiSegments setLabel:lbl forSegment:i];
-        [self.dpiSegments setWidth:0 forSegment:i]; // Auto-balance equal width
+        [self.dpiSegments setWidth:0 forSegment:i];
     }
     if (self.mapper.currentStep >= 0 && self.mapper.currentStep < self.dpiSegments.segmentCount) {
         self.dpiSegments.selectedSegment = self.mapper.currentStep;
     }
     [cv addSubview:self.dpiSegments];
 
-    // Mode Toggle row
+    // Theme Switcher Row: Auto / Light / Dark
+    self.themeLabel = [self label:@"主題：" x:14 w:40 y:0 size:11 bold:NO];
+    [cv addSubview:self.themeLabel];
+
+    self.themeSegments = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(56, 0, 195, 22)];
+    self.themeSegments.segmentCount = 3;
+    self.themeSegments.segmentStyle = NSSegmentStyleRounded;
+    self.themeSegments.trackingMode = NSSegmentSwitchTrackingSelectOne;
+    [self.themeSegments setLabel:@"💻 自動" forSegment:0];
+    [self.themeSegments setLabel:@"☀️ 淺色" forSegment:1];
+    [self.themeSegments setLabel:@"🌙 深色" forSegment:2];
+    self.themeSegments.font = [NSFont systemFontOfSize:10.5];
+    self.themeSegments.selectedSegment = self.currentTheme;
+    self.themeSegments.target = self;
+    self.themeSegments.action = @selector(themeSegmentClicked:);
+    [cv addSubview:self.themeSegments];
+
+    self.testHudBtn = [self button:@"測試 HUD" action:@selector(testHUD:) x:0 w:74 y:0];
+    self.testHudBtn.font = [NSFont systemFontOfSize:11];
+    [cv addSubview:self.testHudBtn];
+
+    // Advanced Checkbox
     self.advancedCheck = [NSButton checkboxWithTitle:@"進階模式（除錯 · 量測）" target:self action:@selector(toggleAdvanced:)];
     self.advancedCheck.font = [NSFont systemFontOfSize:11];
     self.advancedCheck.state = self.advancedMode ? NSControlStateValueOn : NSControlStateValueOff;
     [cv addSubview:self.advancedCheck];
-
-    self.testHudBtn = [self button:@"測試 HUD" action:@selector(testHUD:) x:0 w:72 y:0];
-    self.testHudBtn.font = [NSFont systemFontOfSize:11];
-    [cv addSubview:self.testHudBtn];
 
     // Advanced Section - Operations
     NSButton *startBtn = [self button:@"監看" action:@selector(startMonitoring:) x:0 w:52 y:0];
@@ -569,7 +618,7 @@ static NSString *timeString(NSDate *d) {
     [cv addSubview:measureBtn]; [cv addSubview:applyBtn];
 
     self.measureLabel = [self label:@"（選段 → 沿尺水平移動）" x:0 w:130 y:0 size:9 bold:NO];
-    self.measureLabel.textColor = NSColor.secondaryLabelColor;
+    self.measureLabel.textColor = [NSColor secondaryLabelColor];
     [cv addSubview:self.measureLabel];
 
     self.measureRow = @[self.measureCaption, self.distanceField, self.cmLabel, measureBtn, applyBtn, self.measureLabel];
@@ -648,7 +697,7 @@ static NSString *timeString(NSDate *d) {
 - (void)layoutContent {
     CGFloat y = self.window.contentView.bounds.size.height - 12.0;
 
-    // Header bar (y: H - 32)
+    // Header bar
     y -= 22.0;
     self.titleLabel.frame = NSMakeRect(14.0, y + 2.0, 68.0, 18.0);
     self.badgeLabel.frame = NSMakeRect(84.0, y + 2.0, 140.0, 16.0);
@@ -680,10 +729,15 @@ static NSString *timeString(NSDate *d) {
     y -= 28.0;
     self.dpiSegments.frame = NSMakeRect(14.0, y, 352.0, 26.0);
 
+    // Theme Switcher Row (Auto / Light / Dark)
+    y -= 26.0;
+    self.themeLabel.frame = NSMakeRect(14.0, y + 2.0, 38.0, 18.0);
+    self.themeSegments.frame = NSMakeRect(54.0, y, 215.0, 22.0);
+    self.testHudBtn.frame = NSMakeRect(284.0, y, 82.0, 24.0);
+
     // Mode Toggle row
-    y -= 28.0;
-    self.advancedCheck.frame = NSMakeRect(14.0, y + 2.0, 200.0, 20.0);
-    self.testHudBtn.frame = NSMakeRect(292.0, y, 74.0, 24.0);
+    y -= 26.0;
+    self.advancedCheck.frame = NSMakeRect(14.0, y + 2.0, 240.0, 20.0);
 
     if (!self.advancedMode) {
         return;
@@ -715,7 +769,7 @@ static NSString *timeString(NSDate *d) {
     for (NSView *v in self.advancedViews) v.hidden = !self.advancedMode;
 
     BOOL hasPermWarning = ([self.watcher accessState] != HIDAccessGranted);
-    CGFloat targetH = self.advancedMode ? 620.0 : (hasPermWarning ? 230.0 : 195.0);
+    CGFloat targetH = self.advancedMode ? 630.0 : (hasPermWarning ? 255.0 : 225.0);
 
     NSRect curFrame = self.window.frame;
     CGFloat curTop = NSMaxY(curFrame);
@@ -729,6 +783,31 @@ static NSString *timeString(NSDate *d) {
     (void)sender;
     self.advancedMode = !self.advancedMode;
     [self applyAdvancedMode:YES];
+}
+
+// MARK: - Theme Switching
+
+- (void)themeSegmentClicked:(NSSegmentedControl *)sender {
+    [self applyTheme:sender.selectedSegment];
+}
+
+- (void)applyTheme:(NSInteger)themeIndex {
+    self.currentTheme = themeIndex;
+    [NSUserDefaults.standardUserDefaults setInteger:themeIndex forKey:@"DPIPeek.theme"];
+    if (self.themeSegments.selectedSegment != themeIndex) {
+        self.themeSegments.selectedSegment = themeIndex;
+    }
+
+    if (themeIndex == 1) { // Light
+        self.window.appearance = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
+    } else if (themeIndex == 2) { // Dark
+        self.window.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+    } else { // Auto (Follow system)
+        self.window.appearance = nil;
+    }
+
+    self.container.layer.borderColor = [NSColor separatorColor].CGColor;
+    [self refreshStatus];
 }
 
 // MARK: - DPI Click Switching
@@ -755,12 +834,19 @@ static NSString *timeString(NSDate *d) {
 - (void)refreshStatus {
     HIDAccessState st = self.watcher.accessState;
     NSString *text;
-    NSColor *color = NSColor.labelColor;
+    NSColor *color = [NSColor labelColor];
     switch (st) {
-        case HIDAccessGranted: text = @"權限狀態：已授予「輸入監控」✔"; break;
-        case HIDAccessDenied:  text = @"權限狀態：被拒絕 ✘（請到系統設定開啟）";
-                               color = NSColor.systemRedColor; break;
-        default:               text = @"權限狀態：尚未決定（按要求權限）"; break;
+        case HIDAccessGranted:
+            text = @"權限狀態：已授予「輸入監控」✔";
+            color = [NSColor systemGreenColor];
+            break;
+        case HIDAccessDenied:
+            text = @"權限狀態：被拒絕 ✘（請到系統設定開啟）";
+            color = [NSColor systemRedColor];
+            break;
+        default:
+            text = @"權限狀態：尚未決定（按要求權限）";
+            break;
     }
     self.accessLabel.stringValue = text;
     self.accessLabel.textColor = color;
@@ -790,6 +876,16 @@ static NSString *timeString(NSDate *d) {
         self.dpiSegments.selectedSegment = self.mapper.currentStep;
     }
 
+    // Refresh semantic colors
+    self.titleLabel.textColor = [NSColor labelColor];
+    self.badgeLabel.textColor = [NSColor secondaryLabelColor];
+    self.presetsLabel.textColor = [NSColor labelColor];
+    self.themeLabel.textColor = [NSColor labelColor];
+    self.measureCaption.textColor = [NSColor labelColor];
+    self.cmLabel.textColor = [NSColor labelColor];
+    self.measureLabel.textColor = [NSColor secondaryLabelColor];
+    self.hexLabel.textColor = [NSColor labelColor];
+
     [self layoutContent];
 }
 
@@ -814,7 +910,7 @@ static NSString *timeString(NSDate *d) {
     void (^work)(void) = ^{
         NSAttributedString *attr = [[NSAttributedString alloc] initWithString:line attributes:@{
             NSFontAttributeName: [NSFont monospacedSystemFontOfSize:10 weight:NSFontWeightRegular],
-            NSForegroundColorAttributeName: NSColor.labelColor,
+            NSForegroundColorAttributeName: [NSColor labelColor],
         }];
         NSTextStorage *storage = self.logView.textStorage;
         [storage appendAttributedString:attr];
@@ -1024,7 +1120,7 @@ static NSString *timeString(NSDate *d) {
     (void)sender;
     if (self.mapper.currentStep < 0) {
         NSAlert *a = [NSAlert new];
-        a.messageText = @"請先按一下 DPI 鍵或點擊段數";
+        a.messageText = @"請先按一下 DPI 鍵";
         a.informativeText = @"先切到想量測的那一段，再開始量測。";
         [a runModal];
         return;
