@@ -878,10 +878,24 @@ static NSString *timeString(NSDate *d) {
     NSString *dpiText = (self.mapper.currentStep >= 0) ? [self.mapper hudTitleForStep:self.mapper.currentStep] : @"";
     BOOL vendorActive = self.vendor.isReady && self.vendor.isMouseLinked;
     if (vendorActive) {
-        modeText = [NSString stringWithFormat:@"2.4G · %@", dpiText.length ? dpiText : @"4000 DPI"];
-        self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：%@ ｜ 原廠 2.4G 通道 (0xD4)", self.vendor.deviceName];
+        int batt = [self.vendor readBatteryPercent];
+        NSString *battBadge = @"";
+        if (batt > 0 && batt <= 100) {
+            battBadge = [NSString stringWithFormat:@" · %s %d%%", (batt <= 20 ? "🪫" : "🔋"), batt];
+            self.statusItem.button.title = [NSString stringWithFormat:@"DPI %d%%", batt];
+        } else {
+            self.statusItem.button.title = @"DPI";
+        }
+        modeText = [NSString stringWithFormat:@"2.4G · %@%@", dpiText.length ? dpiText : @"4000 DPI", battBadge];
+        self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：%@ ｜ 原廠 2.4G 通道 (0xD4)%@",
+                                        self.vendor.deviceName,
+                                        (batt > 0 ? [NSString stringWithFormat:@" ｜ 電量：%d%%", batt] : @"")];
         self.presetsLabel.stringValue = @"DPI 段數（2.4G 可點擊直切）：";
+        self.statusItem.button.toolTip = [NSString stringWithFormat:@"DPI Peek — HP Professor 1 (2.4G · %@%@)",
+                                          dpiText.length ? dpiText : @"4000 DPI",
+                                          (batt > 0 ? [NSString stringWithFormat:@" · 電量 %d%%", batt] : @"")];
     } else {
+        self.statusItem.button.title = @"DPI";
         NSArray *ifs = self.watcher.interfaces;
         BOOL hasBLE = NO;
         for (HIDInterfaceInfo *i in ifs) {
@@ -891,12 +905,15 @@ static NSString *timeString(NSDate *d) {
         }
         if (hasBLE) {
             modeText = [NSString stringWithFormat:@"藍牙 · %@", dpiText.length ? dpiText : @"已連線"];
-            self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：藍牙監看中 (%lu 介面)", (unsigned long)ifs.count];
+            self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：藍牙監看中 (%lu 介面) ｜ 藍牙無廣播電量", (unsigned long)ifs.count];
             self.presetsLabel.stringValue = @"目前 DPI 段數（藍牙模式請按滑鼠實體鍵切換）：";
+            self.statusItem.button.toolTip = [NSString stringWithFormat:@"DPI Peek — HP Professor 1 (藍牙 · %@)",
+                                              dpiText.length ? dpiText : @"已連線"];
         } else {
             modeText = @"未連線";
             self.deviceLabel.stringValue = @"裝置：等待滑鼠連線…";
             self.presetsLabel.stringValue = @"DPI 段數（未連線）：";
+            self.statusItem.button.toolTip = @"DPI Peek — 未連線";
         }
     }
     self.badgeLabel.stringValue = modeText;

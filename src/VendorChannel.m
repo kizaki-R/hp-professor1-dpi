@@ -21,10 +21,19 @@ static NSMutableArray *gKeptManagers = nil;
 @property (nonatomic) int lastActive;
 @property (nonatomic) uint8_t dpiOpcode;
 @property (nonatomic) int relayTarget;
+@property (nonatomic) int batteryPercent;
 @property (nonatomic, copy) VendorDPIHandler handler;
 @end
 
 @implementation VendorChannel
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _batteryPercent = -1;
+    }
+    return self;
+}
 
 - (void)dealloc { [self close]; }
 
@@ -51,6 +60,7 @@ static void onVendorDeviceRemoved(void *context, IOReturn result, void *sender) 
         self.device = NULL;
     }
     self.isMouseLinked = NO;
+    self.batteryPercent = -1;
     [self stopPolling];
     if (self.logHandler) self.logHandler(@"2.4G 接收器已移除。");
     if (self.onDisconnectHandler) self.onDisconnectHandler();
@@ -82,6 +92,20 @@ static uint8_t checksum7(const uint8_t *b) {
     pkt[0] = 0xF7;
     [self writePacket:pkt];
     [self readPacket:out];
+    if (out[4] == 0 && out[2] > 0 && out[2] <= 100) {
+        self.batteryPercent = out[2];
+    }
+}
+
+- (int)readBatteryPercent {
+    if (!self.device) return -1;
+    uint8_t st[64];
+    [self receiverStatus:st];
+    if (st[4] == 0 && st[2] > 0 && st[2] <= 100) {
+        self.batteryPercent = st[2];
+        return st[2];
+    }
+    return self.batteryPercent;
 }
 
 // Wait for the receiver to accept a relay, send, wait for the relayed reply, release it.
@@ -307,6 +331,7 @@ static uint8_t checksum7(const uint8_t *b) {
 - (void)close {
     [self stopPolling];
     self.isMouseLinked = NO;
+    self.batteryPercent = -1;
     if (self.device) {
         IOHIDDeviceClose(self.device, kIOHIDOptionsTypeNone);
         CFRelease(self.device);

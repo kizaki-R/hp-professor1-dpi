@@ -20,12 +20,14 @@ typedef void (^VendorDPIHandler)(int levelCount, int activeIndex, NSArray<NSNumb
 @property (nonatomic, readonly) uint8_t dpiOpcode;
 @property (nonatomic, readonly) int relayTarget;      // -1 == direct (wired)
 @property (nonatomic) BOOL isMouseLinked;
+@property (nonatomic, readonly) int batteryPercent;   // 0..100%, or -1 when unknown / BLE
 @property (nonatomic, copy) void (^onDisconnectHandler)(void);
 
 /// Find + open the mouse's vendor interface and verify it answers 0xD4.
 - (BOOL)connectKnownDevice;
 - (BOOL)isReady;
 
+- (int)readBatteryPercent;
 - (NSArray<NSNumber *> *)readDPITableWithCount:(int *)count active:(int *)active;
 - (BOOL)setActiveDPIIndex:(int)index;
 
