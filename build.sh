@@ -3,8 +3,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP="DPIPeek.app"
-CACHE="build/mcache"
+APP="build.noindex/DPIPeek.app"
+CACHE="build.noindex/mcache"
 mkdir -p build "$CACHE"
 
 echo "==> compiling DPIPeek binary"

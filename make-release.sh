@@ -22,7 +22,7 @@ rm -f "$DIST/$NAME.zip" "$DIST/hp-professor1-dpi-$VERSION-src.tar.gz"
 
 echo "==> packaging $NAME.zip"
 # ditto keeps the bundle metadata intact (plain zip can break .app bundles)
-ditto -c -k --sequesterRsrc --keepParent DPIPeek.app "$DIST/$NAME.zip"
+ditto -c -k --sequesterRsrc --keepParent build.noindex/DPIPeek.app "$DIST/$NAME.zip"
 
 echo "==> packaging source"
 tar --exclude='./dist' --exclude='./build' --exclude='./logs' --exclude='./signing' \

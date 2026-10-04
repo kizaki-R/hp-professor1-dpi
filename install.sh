@@ -8,8 +8,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-if [ ! -d "DPIPeek.app" ]; then
-    echo "DPIPeek.app not found — run ./build.sh first"
+SRC="build.noindex/DPIPeek.app"
+if [ ! -d "$SRC" ]; then
+    echo "$SRC not found — run ./build.sh first"
     exit 1
 fi
 
@@ -26,7 +27,7 @@ fi
 
 echo "==> installing to $DEST/DPIPeek.app"
 rm -rf "$DEST/DPIPeek.app"
-cp -R DPIPeek.app "$DEST/"
+cp -R "$SRC" "$DEST/"
 
 echo "==> launched"
 open "$DEST/DPIPeek.app"
