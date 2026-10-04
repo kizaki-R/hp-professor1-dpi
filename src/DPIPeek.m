@@ -445,18 +445,17 @@ static NSString *timeString(NSDate *d) {
     self.window.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
                                      NSWindowCollectionBehaviorFullScreenAuxiliary;
 
-    self.effectView = [[NSVisualEffectView alloc] initWithFrame:self.window.contentView.bounds];
-    self.effectView.material = NSVisualEffectMaterialHUDWindow;
-    self.effectView.blendingMode = NSVisualEffectBlendingModeBehindWindow;
-    self.effectView.state = NSVisualEffectStateActive;
-    self.effectView.wantsLayer = YES;
-    self.effectView.layer.cornerRadius = 16.0;
-    self.effectView.layer.masksToBounds = YES;
-    self.effectView.layer.borderWidth = 1.0;
-    self.effectView.layer.borderColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.18].CGColor;
-    self.effectView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    self.window.contentView = self.effectView;
-    NSView *cv = self.effectView;
+    // Layer-backed container view: clips rounded corners cleanly with NO white/gray borders
+    NSView *container = [[NSView alloc] initWithFrame:self.window.contentView.bounds];
+    container.wantsLayer = YES;
+    container.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.12 alpha:0.96].CGColor;
+    container.layer.cornerRadius = 16.0;
+    container.layer.masksToBounds = YES;
+    container.layer.borderWidth = 1.0;
+    container.layer.borderColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.18].CGColor;
+    container.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    self.window.contentView = container;
+    NSView *cv = container;
 
     // Header Bar
     self.titleLabel = [self label:@"DPI Peek" x:14 w:65 y:0 size:13 bold:YES];
@@ -497,7 +496,7 @@ static NSString *timeString(NSDate *d) {
     self.permRow = @[askBtn, setBtn];
 
     // DPI Segment Control: 7 Clickable Segments (Click to switch DPI instantly!)
-    self.presetsLabel = [self label:@"DPI 段數（點擊直接切換）：" x:14 w:352 y:0 size:11 bold:YES];
+    self.presetsLabel = [self label:@"目前 DPI 段數（請按滑鼠實體鍵切換）：" x:14 w:352 y:0 size:11 bold:YES];
     [cv addSubview:self.presetsLabel];
 
     self.dpiSegments = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(14, 0, 352, 26)];
@@ -735,47 +734,22 @@ static NSString *timeString(NSDate *d) {
 // MARK: - DPI Click Switching
 
 - (void)dpiSegmentClicked:(NSSegmentedControl *)sender {
-    NSInteger index = sender.selectedSegment;
-    [self switchToDPIIndex:index];
-}
+    NSInteger clickedIndex = sender.selectedSegment;
 
-- (void)switchToDPIIndex:(NSInteger)index {
-    if (index < 0 || index >= [self.mapper stepCount]) return;
-
-    self.mapper.currentStep = index;
-    if (index < self.dpiSegments.segmentCount) {
-        self.dpiSegments.selectedSegment = index;
+    // Keep the UI strictly synchronized with the true hardware state
+    if (self.mapper.currentStep >= 0 && self.mapper.currentStep < self.dpiSegments.segmentCount) {
+        self.dpiSegments.selectedSegment = self.mapper.currentStep;
     }
 
-    NSString *title = [self.mapper hudTitleForStep:index];
-    NSString *sub = [self.mapper hudSubtitleForStep:index];
+    NSString *clickedDPI = [self.mapper hudTitleForStep:clickedIndex];
+    NSString *curDPI = (self.mapper.currentStep >= 0) ? [self.mapper hudTitleForStep:self.mapper.currentStep] : @"?";
 
-    // 1. Show HUD overlay immediately
-    [HUDWindow.sharedHUD showTitle:title subtitle:sub];
+    // Show HUD to remind user that this mouse requires the physical DPI button to alter hardware sensor
+    [HUDWindow.sharedHUD showTitle:curDPI
+                          subtitle:[NSString stringWithFormat:@"點選了 %@ · 請按滑鼠實體 DPI 鍵切換", clickedDPI]];
 
-    // 2. If 2.4G vendor channel is connected, send hardware command to switch DPI
-    if (self.vendor.isReady) {
-        [self.vendor setActiveDPIIndex:(int)index];
-    }
-
-    // 3. If BLE mode is connected, send the vendor 66 0C report
-    for (HIDInterfaceInfo *i in self.watcher.interfaces) {
-        if (i.maxOutputReportSize > 0) {
-            uint8_t buf[66] = {0};
-            buf[0] = 0x06;
-            buf[1] = 0x66;
-            buf[2] = 0x0C;
-            buf[3] = (uint8_t)index;
-            [self.watcher sendOutputReport:[NSData dataWithBytes:buf length:sizeof(buf)]
-                               toInterface:i
-                                     error:NULL];
-        }
-    }
-
-    [self appendLog:[NSString stringWithFormat:@"%@ [點擊切換] 第 %ld 段 → %@",
-                     timeString(NSDate.date), (long)(index + 1), title]];
-
-    [self refreshStatus];
+    [self appendLog:[NSString stringWithFormat:@"%@ 提示：此滑鼠硬體韌體僅支援實體鍵切換感測器，目前為 %@",
+                     timeString(NSDate.date), curDPI]];
 }
 
 - (void)refreshStatus {
