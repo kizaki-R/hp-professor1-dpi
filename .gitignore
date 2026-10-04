@@ -1,0 +1,17 @@
+# build artefacts
+build/
+*.o
+probe
+royuan
+DPIPeek.app/
+dist/
+
+# local code-signing identity: NEVER commit (contains a private key)
+signing/
+
+# runtime logs (contain the user's own device captures)
+logs/
+
+# macOS noise
+.DS_Store
+._*
