@@ -228,6 +228,9 @@ static NSString *timeString(NSDate *d) {
     self.watcher.logHandler = ^(NSString *line) {
         [weakSelf appendLog:line];
     };
+    self.watcher.interfaceChangedHandler = ^{
+        [weakSelf refreshStatus];
+    };
 
     self.activity = [NSProcessInfo.processInfo
                      beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep
@@ -873,15 +876,28 @@ static NSString *timeString(NSDate *d) {
     // Update connection status and badge
     NSString *modeText = @"未連線";
     NSString *dpiText = (self.mapper.currentStep >= 0) ? [self.mapper hudTitleForStep:self.mapper.currentStep] : @"";
-    if (self.vendor.isReady) {
+    BOOL vendorActive = self.vendor.isReady && self.vendor.isMouseLinked;
+    if (vendorActive) {
         modeText = [NSString stringWithFormat:@"2.4G · %@", dpiText.length ? dpiText : @"4000 DPI"];
         self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：%@ ｜ 原廠 2.4G 通道 (0xD4)", self.vendor.deviceName];
-    } else if (self.watcher.isMonitoring) {
-        NSArray *ifs = self.watcher.interfaces;
-        modeText = [NSString stringWithFormat:@"藍牙 · %@", dpiText.length ? dpiText : @"已連線"];
-        self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：藍牙監看中 (%lu 介面)", (unsigned long)ifs.count];
+        self.presetsLabel.stringValue = @"DPI 段數（2.4G 可點擊直切）：";
     } else {
-        self.deviceLabel.stringValue = @"裝置：未連線";
+        NSArray *ifs = self.watcher.interfaces;
+        BOOL hasBLE = NO;
+        for (HIDInterfaceInfo *i in ifs) {
+            if (i.productID == 0x4028 || [i.product containsString:@"Professor"]) {
+                hasBLE = YES; break;
+            }
+        }
+        if (hasBLE) {
+            modeText = [NSString stringWithFormat:@"藍牙 · %@", dpiText.length ? dpiText : @"已連線"];
+            self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：藍牙監看中 (%lu 介面)", (unsigned long)ifs.count];
+            self.presetsLabel.stringValue = @"目前 DPI 段數（藍牙模式請按滑鼠實體鍵切換）：";
+        } else {
+            modeText = @"未連線";
+            self.deviceLabel.stringValue = @"裝置：等待滑鼠連線…";
+            self.presetsLabel.stringValue = @"DPI 段數（未連線）：";
+        }
     }
     self.badgeLabel.stringValue = modeText;
 
@@ -947,12 +963,15 @@ static NSString *timeString(NSDate *d) {
 
 - (void)connectVendorChannel {
     __weak AppDelegate *weakSelf = self;
-    if (self.vendor.isReady) {
+    if (self.vendor.isReady && self.vendor.isMouseLinked) {
         [self refreshStatus];
         return;
     }
     self.vendor = self.vendor ?: [VendorChannel new];
     self.vendor.logHandler = ^(NSString *line) { [weakSelf appendLog:line]; };
+    self.vendor.onDisconnectHandler = ^{
+        [weakSelf refreshStatus];
+    };
     if (![self.vendor connectKnownDevice]) {
         [self refreshStatus];
         return;
@@ -965,7 +984,9 @@ static NSString *timeString(NSDate *d) {
 
 - (void)vendorRetryTick:(NSTimer *)timer {
     (void)timer;
-    if (!self.vendor.isReady) [self connectVendorChannel];
+    if (!self.vendor.isReady || !self.vendor.isMouseLinked) {
+        [self connectVendorChannel];
+    }
 }
 
 - (void)handleVendorDPIWithCount:(int)count active:(int)active values:(NSArray<NSNumber *> *)values {

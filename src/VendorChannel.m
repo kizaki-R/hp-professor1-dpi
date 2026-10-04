@@ -37,6 +37,25 @@ static NSMutableArray *gKeptManagers = nil;
     return [NSString stringWithFormat:@"%@ %04X:%04X", p ?: @"?", kVID, pid.intValue];
 }
 
+static void onVendorDeviceRemoved(void *context, IOReturn result, void *sender) {
+    (void)result; (void)sender;
+    VendorChannel *ch = (__bridge VendorChannel *)context;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [ch handleDeviceRemoved];
+    });
+}
+
+- (void)handleDeviceRemoved {
+    if (self.device) {
+        CFRelease(self.device);
+        self.device = NULL;
+    }
+    self.isMouseLinked = NO;
+    [self stopPolling];
+    if (self.logHandler) self.logHandler(@"2.4G 接收器已移除。");
+    if (self.onDisconnectHandler) self.onDisconnectHandler();
+}
+
 // MARK: - transport
 
 static uint8_t checksum7(const uint8_t *b) {
@@ -162,6 +181,7 @@ static uint8_t checksum7(const uint8_t *b) {
         return NO;
     }
     self.device = (IOHIDDeviceRef)CFRetain(candidate);
+    IOHIDDeviceRegisterRemovalCallback(candidate, onVendorDeviceRemoved, (__bridge void *)self);
     [self keepManager:m];
 
     // the receiver relays to the mouse; wired mode answers directly
@@ -174,6 +194,7 @@ static uint8_t checksum7(const uint8_t *b) {
         [self sendCommand:cmd reply:reply];
         NSArray *vals = [self decodeKnownTable:reply count:NULL active:NULL];
         if (vals) {
+            self.isMouseLinked = YES;
             if (self.logHandler) {
                 self.logHandler([NSString stringWithFormat:@"✔ 原廠通道已連上：%@（DPI 0x%02X，%@，%lu 段）",
                                  self.deviceName, self.dpiOpcode,
@@ -183,6 +204,7 @@ static uint8_t checksum7(const uint8_t *b) {
             return YES;
         }
     }
+    self.isMouseLinked = NO;
     if (self.logHandler) self.logHandler(@"原廠介面有回應，但 DPI 表讀取失敗（滑鼠可能睡著，稍後自動重試）");
     [self close];
     return NO;
@@ -191,11 +213,24 @@ static uint8_t checksum7(const uint8_t *b) {
 // MARK: - DPI table
 
 - (NSArray<NSNumber *> *)readDPITableWithCount:(int *)count active:(int *)active {
-    if (!self.device) return nil;
+    if (!self.device) {
+        self.isMouseLinked = NO;
+        return nil;
+    }
     uint8_t cmd[64] = {0}, reply[64];
     cmd[0] = self.dpiOpcode ?: kDPIOpcode;
     [self sendCommand:cmd reply:reply];
-    return [self decodeKnownTable:reply count:count active:active];
+    NSArray<NSNumber *> *vals = [self decodeKnownTable:reply count:count active:active];
+    BOOL nowLinked = (vals != nil);
+    if (self.isMouseLinked != nowLinked) {
+        self.isMouseLinked = nowLinked;
+        if (!nowLinked && self.onDisconnectHandler) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (self.onDisconnectHandler) self.onDisconnectHandler();
+            });
+        }
+    }
+    return vals;
 }
 
 - (BOOL)setActiveDPIIndex:(int)index {
@@ -271,6 +306,7 @@ static uint8_t checksum7(const uint8_t *b) {
 
 - (void)close {
     [self stopPolling];
+    self.isMouseLinked = NO;
     if (self.device) {
         IOHIDDeviceClose(self.device, kIOHIDOptionsTypeNone);
         CFRelease(self.device);

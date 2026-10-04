@@ -12,6 +12,8 @@ typedef NS_ENUM(NSInteger, HIDAccessState) {
 @property (nonatomic) NSUInteger index;
 @property (nonatomic, copy) NSString *product;
 @property (nonatomic, copy) NSString *transport;
+@property (nonatomic) uint32_t vendorID;
+@property (nonatomic) uint32_t productID;
 @property (nonatomic) NSInteger usagePage;
 @property (nonatomic) NSInteger usage;
 @property (nonatomic) NSInteger maxInputReportSize;
@@ -25,6 +27,7 @@ typedef NS_ENUM(NSInteger, HIDAccessState) {
 
 @property (nonatomic, copy) void (^reportHandler)(HIDInterfaceInfo *iface, uint32_t reportID, NSData *payload, NSDate *when);
 @property (nonatomic, copy) void (^logHandler)(NSString *line);
+@property (nonatomic, copy) void (^interfaceChangedHandler)(void);
 @property (nonatomic, readonly) NSString *lastError;
 
 - (HIDAccessState)accessState;

@@ -34,6 +34,8 @@ static HIDInterfaceInfo *describeDevice(IOHIDDeviceRef dev, NSUInteger index) {
     info.index = index;
     info.product = (__bridge NSString *)IOHIDDeviceGetProperty(dev, CFSTR(kIOHIDProductKey)) ?: @"?";
     info.transport = (__bridge NSString *)IOHIDDeviceGetProperty(dev, CFSTR(kIOHIDTransportKey)) ?: @"?";
+    info.vendorID = (uint32_t)[(__bridge NSNumber *)IOHIDDeviceGetProperty(dev, CFSTR(kIOHIDVendorIDKey)) unsignedIntValue];
+    info.productID = (uint32_t)[(__bridge NSNumber *)IOHIDDeviceGetProperty(dev, CFSTR(kIOHIDProductIDKey)) unsignedIntValue];
     info.usagePage = [(__bridge NSNumber *)IOHIDDeviceGetProperty(dev, CFSTR(kIOHIDPrimaryUsagePageKey)) integerValue];
     info.usage = [(__bridge NSNumber *)IOHIDDeviceGetProperty(dev, CFSTR(kIOHIDPrimaryUsageKey)) integerValue];
     info.maxInputReportSize = [(__bridge NSNumber *)IOHIDDeviceGetProperty(dev, CFSTR(kIOHIDMaxInputReportSizeKey)) integerValue];
@@ -182,6 +184,9 @@ static void deviceRemovedCallback(void *context, IOReturn result, void *sender, 
     } else {
         if (self.logHandler) self.logHandler([NSString stringWithFormat:@"介面 #%lu 開啟失敗 (0x%08X)", (unsigned long)info.index, r]);
     }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (self.interfaceChangedHandler) self.interfaceChangedHandler();
+    });
 }
 
 - (void)detachDevice:(IOHIDDeviceRef)dev {
@@ -195,6 +200,9 @@ static void deviceRemovedCallback(void *context, IOReturn result, void *sender, 
     [self.devicePtrs removeObjectAtIndex:idx];
     [self.infos removeObjectAtIndex:idx];
     for (NSUInteger i = 0; i < self.infos.count; i++) self.infos[i].index = i;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (self.interfaceChangedHandler) self.interfaceChangedHandler();
+    });
 }
 
 - (void)stopMonitoring {
