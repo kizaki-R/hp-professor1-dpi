@@ -1,5 +1,6 @@
 // DPIMapper.m
 #import "DPIMapper.h"
+#import "Localization.h"
 
 static NSString *const kPresetsKey = @"DPIPeek.presets.v2";
 static const NSInteger kStepCount = 7;
@@ -62,15 +63,12 @@ static const NSInteger kStepCount = 7;
 - (NSString *)hudTitleForStep:(NSInteger)step {
     if (step < 0) return @"?";
     NSNumber *v = [self presetForStep:step];
-    return v ? [NSString stringWithFormat:@"%@ DPI", v] : [NSString stringWithFormat:@"第 %ld 段", (long)(step + 1)];
+    return [Localization.shared hudTitleForStep:step preset:v];
 }
 
 - (NSString *)hudSubtitleForStep:(NSInteger)step {
     if (step < 0) return @"";
-    NSNumber *v = [self presetForStep:step];
-    if (v) return [NSString stringWithFormat:@"第 %ld / %ld 段", (long)(step + 1), (long)kStepCount];
-    return [NSString stringWithFormat:@"%ld 段中的第 %ld 段 · 可在 DPI Peek 填入數值",
-            (long)kStepCount, (long)(step + 1)];
+    return [Localization.shared hudSubtitleForStep:step total:kStepCount];
 }
 
 @end

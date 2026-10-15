@@ -10,7 +10,7 @@ mkdir -p build "$CACHE"
 echo "==> compiling HPProfessor1DPI binary"
 clang -fobjc-arc -fmodules-cache-path="$CACHE" -O2 -Wall \
     -o build/HPProfessor1DPI \
-    src/DPIPeek.m src/HIDWatcher.m src/DPIMapper.m src/VendorChannel.m src/BLEBatteryReader.m \
+    src/DPIPeek.m src/HIDWatcher.m src/DPIMapper.m src/VendorChannel.m src/BLEBatteryReader.m src/Localization.m \
     -framework Cocoa -framework IOKit -framework CoreBluetooth
 
 echo "==> compiling probe CLI"

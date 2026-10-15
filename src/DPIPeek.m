@@ -18,6 +18,7 @@
 #import "DPIMapper.h"
 #import "VendorChannel.h"
 #import "BLEBatteryReader.h"
+#import "Localization.h"
 
 // MARK: - helpers
 
@@ -171,6 +172,7 @@ static NSString *timeString(NSDate *d) {
 
 @property (nonatomic, strong) NSTextField *themeLabel;
 @property (nonatomic, strong) NSSegmentedControl *themeSegments;
+@property (nonatomic, strong) NSSegmentedControl *langSegments;
 @property (nonatomic, strong) NSButton *testHudBtn;
 
 @property (nonatomic, strong) NSArray *permRow;
@@ -217,6 +219,7 @@ static NSString *timeString(NSDate *d) {
 
     [self openLogFile];
     [self buildWindow];
+    [self updateLocalizedUI];
     [self applyTheme:self.currentTheme];
 
     self.bleBattery = [BLEBatteryReader new];
@@ -573,21 +576,34 @@ static NSString *timeString(NSDate *d) {
     self.themeLabel = [self label:@"主題：" x:14 w:40 y:0 size:11 bold:NO];
     [cv addSubview:self.themeLabel];
 
-    self.themeSegments = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(56, 0, 195, 22)];
+    self.themeSegments = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(56, 0, 142, 22)];
     self.themeSegments.segmentCount = 3;
     self.themeSegments.segmentStyle = NSSegmentStyleRounded;
     self.themeSegments.trackingMode = NSSegmentSwitchTrackingSelectOne;
-    [self.themeSegments setLabel:@"💻 自動" forSegment:0];
-    [self.themeSegments setLabel:@"☀️ 淺色" forSegment:1];
-    [self.themeSegments setLabel:@"🌙 深色" forSegment:2];
-    self.themeSegments.font = [NSFont systemFontOfSize:10.5];
+    [self.themeSegments setLabel:@"自動" forSegment:0];
+    [self.themeSegments setLabel:@"淺色" forSegment:1];
+    [self.themeSegments setLabel:@"深色" forSegment:2];
+    self.themeSegments.font = [NSFont systemFontOfSize:10.0];
     self.themeSegments.selectedSegment = self.currentTheme;
     self.themeSegments.target = self;
     self.themeSegments.action = @selector(themeSegmentClicked:);
     [cv addSubview:self.themeSegments];
 
-    self.testHudBtn = [self button:@"測試 HUD" action:@selector(testHUD:) x:0 w:74 y:0];
-    self.testHudBtn.font = [NSFont systemFontOfSize:11];
+    self.langSegments = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(204, 0, 94, 22)];
+    self.langSegments.segmentCount = 3;
+    self.langSegments.segmentStyle = NSSegmentStyleRounded;
+    self.langSegments.trackingMode = NSSegmentSwitchTrackingSelectOne;
+    [self.langSegments setLabel:@"繁" forSegment:0];
+    [self.langSegments setLabel:@"简" forSegment:1];
+    [self.langSegments setLabel:@"EN" forSegment:2];
+    self.langSegments.font = [NSFont systemFontOfSize:10.0 weight:NSFontWeightMedium];
+    self.langSegments.selectedSegment = Localization.shared.currentLanguage;
+    self.langSegments.target = self;
+    self.langSegments.action = @selector(langSegmentClicked:);
+    [cv addSubview:self.langSegments];
+
+    self.testHudBtn = [self button:@"HUD" action:@selector(testHUD:) x:0 w:58 y:0];
+    self.testHudBtn.font = [NSFont systemFontOfSize:10.5];
     [cv addSubview:self.testHudBtn];
 
     [self applyAdvancedMode:NO];
@@ -657,11 +673,34 @@ static NSString *timeString(NSDate *d) {
     y -= 28.0;
     self.dpiSegments.frame = NSMakeRect(14.0, y, 352.0, 26.0);
 
-    // Theme Switcher Row (Auto / Light / Dark)
+    // Theme & Language Row
     y -= 28.0;
-    self.themeLabel.frame = NSMakeRect(14.0, y + 2.0, 38.0, 18.0);
-    self.themeSegments.frame = NSMakeRect(54.0, y, 215.0, 22.0);
-    self.testHudBtn.frame = NSMakeRect(284.0, y, 82.0, 24.0);
+    self.themeLabel.frame = NSMakeRect(14.0, y + 2.0, 40.0, 18.0);
+    self.themeSegments.frame = NSMakeRect(56.0, y, 142.0, 22.0);
+    self.langSegments.frame = NSMakeRect(204.0, y, 94.0, 22.0);
+    self.testHudBtn.frame = NSMakeRect(304.0, y, 62.0, 24.0);
+}
+
+- (void)langSegmentClicked:(NSSegmentedControl *)sender {
+    Localization.shared.currentLanguage = (AppLanguage)sender.selectedSegment;
+    [self updateLocalizedUI];
+    [self refreshStatus];
+}
+
+- (void)updateLocalizedUI {
+    Localization *loc = Localization.shared;
+    self.pinCheck.title = [loc pin];
+    self.pinCheck.toolTip = [loc pinTooltip];
+    self.quitBtn.title = [loc quit];
+    self.themeLabel.stringValue = [loc themeTitle];
+    [self.themeSegments setLabel:[loc themeAuto] forSegment:0];
+    [self.themeSegments setLabel:[loc themeLight] forSegment:1];
+    [self.themeSegments setLabel:[loc themeDark] forSegment:2];
+    self.testHudBtn.title = [loc testHUD];
+    if (self.permRow.count >= 2) {
+        ((NSButton *)self.permRow[0]).title = [loc reqPermBtn];
+        ((NSButton *)self.permRow[1]).title = [loc openSettingsBtn];
+    }
 }
 
 - (void)applyAdvancedMode:(BOOL)animate {
@@ -737,8 +776,14 @@ static NSString *timeString(NSDate *d) {
             self.dpiSegments.selectedSegment = self.mapper.currentStep;
         }
         NSString *curDPI = (self.mapper.currentStep >= 0) ? [self.mapper hudTitleForStep:self.mapper.currentStep] : @"?";
+        NSString *bleLimitSub = @"藍牙模式限制：請按滑鼠實體 DPI 鍵切換";
+        if (Localization.shared.currentLanguage == AppLangZhCn) {
+            bleLimitSub = @"蓝牙模式限制：请按鼠标实体 DPI 键切换";
+        } else if (Localization.shared.currentLanguage == AppLangEn) {
+            bleLimitSub = @"Bluetooth Mode: Use physical DPI button to switch";
+        }
         [HUDWindow.sharedHUD showTitle:curDPI
-                              subtitle:@"藍牙模式限制：請按滑鼠實體 DPI 鍵切換"];
+                              subtitle:bleLimitSub];
         [self appendLog:[NSString stringWithFormat:@"%@ 提示：藍牙模式僅支援滑鼠單向通知，請改插 2.4G 接收器即可軟體直切",
                          timeString(NSDate.date)]];
     }
@@ -747,27 +792,28 @@ static NSString *timeString(NSDate *d) {
 }
 
 - (void)refreshStatus {
+    Localization *loc = Localization.shared;
     HIDAccessState st = self.watcher.accessState;
     NSString *text;
     NSColor *color = [NSColor labelColor];
     switch (st) {
         case HIDAccessGranted:
-            text = @"權限狀態：已授予「輸入監控」✔";
+            text = [loc permGranted];
             color = [NSColor systemGreenColor];
             break;
         case HIDAccessDenied:
-            text = @"權限狀態：被拒絕 ✘（請到系統設定開啟）";
+            text = [loc permDenied];
             color = [NSColor systemRedColor];
             break;
         default:
-            text = @"權限狀態：尚未決定（按要求權限）";
+            text = [loc permUnknown];
             break;
     }
     self.accessLabel.stringValue = text;
     self.accessLabel.textColor = color;
 
     // Update connection status and badge
-    NSString *modeText = @"未連線";
+    NSString *modeText = [loc modeOffline];
     NSString *dpiText = (self.mapper.currentStep >= 0) ? [self.mapper hudTitleForStep:self.mapper.currentStep] : @"";
     BOOL vendorActive = self.vendor.isReady && self.vendor.isMouseLinked;
     if (vendorActive) {
@@ -782,12 +828,11 @@ static NSString *timeString(NSDate *d) {
             battBadge = [NSString stringWithFormat:@" · %s %d%%", (batt <= 20 ? "🪫" : "🔋"), batt];
         }
         [self updateMenuBarDisplayWithStep:self.mapper.currentStep battery:batt];
-        modeText = [NSString stringWithFormat:@"2.4G · %@%@", dpiText.length ? dpiText : @"4000 DPI", battBadge];
-        self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：%@ ｜ 原廠 2.4G 通道 (0xD4)%@",
-                                        self.vendor.deviceName,
-                                        (batt > 0 ? [NSString stringWithFormat:@" ｜ 電量：%d%%", batt] : @"")];
-        self.presetsLabel.stringValue = @"DPI 段數（2.4G 可點擊直切）：";
-        self.statusItem.button.toolTip = [NSString stringWithFormat:@"HP Professor 1 DPI (2.4G · %@%@)",
+        modeText = [NSString stringWithFormat:@"%@ · %@%@", [loc modeDongle], dpiText.length ? dpiText : @"4000 DPI", battBadge];
+        self.deviceLabel.stringValue = [loc device24G:self.vendor.deviceName battery:batt];
+        self.presetsLabel.stringValue = [loc presetsHeader24G];
+        self.statusItem.button.toolTip = [NSString stringWithFormat:@"HP Professor 1 DPI (%@ · %@%@)",
+                                          [loc modeDongle],
                                           dpiText.length ? dpiText : @"4000 DPI",
                                           (batt > 0 ? [NSString stringWithFormat:@" · 電量 %d%%", batt] : @"")];
     } else {
@@ -810,20 +855,19 @@ static NSString *timeString(NSDate *d) {
                 battBadge = [NSString stringWithFormat:@" · %s %d%%", (batt <= 20 ? "🪫" : "🔋"), batt];
             }
             [self updateMenuBarDisplayWithStep:self.mapper.currentStep battery:batt];
-            modeText = [NSString stringWithFormat:@"藍牙 · %@%@", dpiText.length ? dpiText : @"已連線", battBadge];
-            self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：藍牙監看中 (%lu 介面)%@",
-                                            (unsigned long)ifs.count,
-                                            (batt > 0 ? [NSString stringWithFormat:@" ｜ 電量：%d%%", batt] : @"")];
-            self.presetsLabel.stringValue = @"目前 DPI 段數（藍牙模式請按滑鼠實體鍵切換）：";
-            self.statusItem.button.toolTip = [NSString stringWithFormat:@"HP Professor 1 DPI (藍牙 · %@%@)",
-                                              dpiText.length ? dpiText : @"已連線",
+            modeText = [NSString stringWithFormat:@"%@ · %@%@", [loc modeBluetooth], dpiText.length ? dpiText : ([loc currentLanguage] == AppLangEn ? @"Connected" : @"已連線"), battBadge];
+            self.deviceLabel.stringValue = [loc deviceBLE:ifs.count battery:batt];
+            self.presetsLabel.stringValue = [loc presetsHeaderBLE];
+            self.statusItem.button.toolTip = [NSString stringWithFormat:@"HP Professor 1 DPI (%@ · %@%@)",
+                                              [loc modeBluetooth],
+                                              dpiText.length ? dpiText : ([loc currentLanguage] == AppLangEn ? @"Connected" : @"已連線"),
                                               (batt > 0 ? [NSString stringWithFormat:@" · 電量 %d%%", batt] : @"")];
         } else {
             [self updateMenuBarDisplayWithStep:0 battery:-1];
-            modeText = @"未連線";
-            self.deviceLabel.stringValue = @"裝置：等待滑鼠連線…";
-            self.presetsLabel.stringValue = @"DPI 段數（未連線）：";
-            self.statusItem.button.toolTip = @"HP Professor 1 DPI — 未連線";
+            modeText = [loc modeOffline];
+            self.deviceLabel.stringValue = [loc deviceOffline];
+            self.presetsLabel.stringValue = [loc presetsHeaderOffline];
+            self.statusItem.button.toolTip = [NSString stringWithFormat:@"HP Professor 1 DPI — %@", [loc modeOffline]];
         }
     }
     self.badgeLabel.stringValue = modeText;

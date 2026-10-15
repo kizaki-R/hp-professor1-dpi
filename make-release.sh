@@ -10,19 +10,21 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" src/Info.plist 2>/dev/null || echo 1.0)
-NAME="DPIPeek-$VERSION"
+VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" src/Info.plist 2>/dev/null || echo 1.1)
+MAC_ZIP="HP-Professor-1-DPI-macOS.zip"
+LEGACY_ZIP="DPIPeek-$VERSION.zip"
 DIST="dist"
 
 echo "==> building"
 ./build.sh
 
 mkdir -p "$DIST"
-rm -f "$DIST/$NAME.zip" "$DIST/hp-professor1-dpi-$VERSION-src.tar.gz"
+rm -f "$DIST/$MAC_ZIP" "$DIST/$LEGACY_ZIP" "$DIST/hp-professor1-dpi-$VERSION-src.tar.gz"
 
-echo "==> packaging $NAME.zip"
+echo "==> packaging $MAC_ZIP and $LEGACY_ZIP"
 # ditto keeps the bundle metadata intact (plain zip can break .app bundles)
-ditto -c -k --sequesterRsrc --keepParent "build.noindex/HP Professor 1 DPI.app" "$DIST/$NAME.zip"
+ditto -c -k --sequesterRsrc --keepParent "build.noindex/HP Professor 1 DPI.app" "$DIST/$MAC_ZIP"
+cp "$DIST/$MAC_ZIP" "$DIST/$LEGACY_ZIP"
 
 echo "==> packaging source"
 tar --exclude='./dist' --exclude='./build' --exclude='./logs' --exclude='./signing' \
