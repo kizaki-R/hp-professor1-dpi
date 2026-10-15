@@ -11,6 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" src/Info.plist 2>/dev/null || echo 1.1)
+MAC_DMG="HP-Professor-1-DPI-macOS.dmg"
 MAC_ZIP="HP-Professor-1-DPI-macOS.zip"
 LEGACY_ZIP="DPIPeek-$VERSION.zip"
 DIST="dist"
@@ -19,9 +20,19 @@ echo "==> building"
 ./build.sh
 
 mkdir -p "$DIST"
-rm -f "$DIST/$MAC_ZIP" "$DIST/$LEGACY_ZIP" "$DIST/hp-professor1-dpi-$VERSION-src.tar.gz"
+rm -f "$DIST/$MAC_DMG" "$DIST/$MAC_ZIP" "$DIST/$LEGACY_ZIP" "$DIST/hp-professor1-dpi-$VERSION-src.tar.gz"
 
-echo "==> packaging $MAC_ZIP and $LEGACY_ZIP"
+echo "==> packaging standard macOS installer (.dmg)"
+STAGING="/tmp/hp-dpi-dmg-staging"
+rm -rf "$STAGING"
+mkdir -p "$STAGING"
+cp -R "build.noindex/HP Professor 1 DPI.app" "$STAGING/"
+ln -s /Applications "$STAGING/Applications"
+hdiutil create -ov -volname "HP Professor 1 DPI" -srcfolder "$STAGING" -fs HFS+ \
+    -format UDZO -imagekey zlib-level=9 "$DIST/$MAC_DMG" >/dev/null
+rm -rf "$STAGING"
+
+echo "==> packaging zip archives"
 # ditto keeps the bundle metadata intact (plain zip can break .app bundles)
 ditto -c -k --sequesterRsrc --keepParent "build.noindex/HP Professor 1 DPI.app" "$DIST/$MAC_ZIP"
 cp "$DIST/$MAC_ZIP" "$DIST/$LEGACY_ZIP"
