@@ -24,3 +24,15 @@ cargo build --release
 ```
 
 幾何寫在 `gen_icons.py` 和 `src/paint.rs` 兩邊，值要一致——HUD 是用 GDI+ 畫的，不是貼圖。兩邊都抄自 VELOCITY 的 SVG：間距 44、線寬 29、斜率 0.24。
+
+## 出發布檔
+
+`cargo build` 的產物沒有資源區段，資料夾裡會是空圖示、內容也沒版本號。發布前補上：
+
+```
+python stamp_resources.py target/release/dpi-peek.exe HP-Professor-1-DPI-windows.exe
+```
+
+它用 Windows SDK 的 `rc.exe` 編 `assets/app.rc`，把圖示和版本資訊接成 `.rsrc` 區段。`.res` 的格式和映像檔要的三層目錄不一樣，所以目錄是在這支腳本裡組的。SDK 標頭檔沒裝也能跑——`app.rc` 不 include `windows.h`。
+
+找不到 `rc.exe` 時腳本會原樣複製並回傳 2，所以平常的 `cargo build` 不依賴 SDK。

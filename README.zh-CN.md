@@ -8,12 +8,12 @@ Mac 是菜单栏工具。Windows 是常驻程序，开始菜单里的名字是 *
 
 ## 下载
 
-到 [Releases](https://github.com/kizaki-R/hp-professor1-dpi/releases) 取对应文件。Windows 的文件名是 `HP-Professor-1-DPI-windows.exe`，不是 `DPIPeek.exe`。`DPIPeek` 只留在 Mac app，以及 Windows 装好之后的文件夹 `%LOCALAPPDATA%\DPIPeek\`。
+到 [Releases](https://github.com/kizaki-R/hp-professor1-dpi/releases) 取对应文件。Windows 的文件名是 `HP-Professor-1-DPI-windows.exe`，不是 `DPIPeek.exe`。`DPIPeek` 现在只留在 Windows 的安装文件夹 `%LOCALAPPDATA%\DPIPeek\` 和部分源码文件名里。
 
 | 系统 | 文件 | 第一次打开 |
 |---|---|---|
 | Windows 10 / 11 | `HP-Professor-1-DPI-windows.exe` | 双击。程序会把自己复制到 `%LOCALAPPDATA%\DPIPeek\`，并加入当前用户的开机启动和开始菜单。不需要管理员。 |
-| macOS 11+ | `DPIPeek-*.zip` | 解压后把 `DPIPeek.app` 放进“应用程序”。第一次请在图标上右键再打开。 |
+| macOS 11+ | `HP-Professor-1-DPI-macOS.dmg`（或 `.zip`） | 打开 dmg，把 **HP Professor 1 DPI** 拖进“应用程序”。第一次请在图标上右键再打开。 |
 
 Windows 这支没有签名。SmartScreen 会拦，画面上先只有“不运行”。点“更多信息”，才会出现“仍要运行”。同一台电脑按过一次就会记住。
 
@@ -89,16 +89,16 @@ DPI 是光学传感器的物理采样分辨率。操作系统底层通常仅接�
 git clone https://github.com/kizaki-R/hp-professor1-dpi.git
 cd hp-professor1-dpi
 ./make-identity.sh      # 创建本机持久化自签名证书（仅需执行一次，后续重新编译无需重复授权）
-./build.sh              # 编译 DPIPeek.app、probe 与 royuan
+./build.sh              # 编译 HP Professor 1 DPI.app、probe 与 royuan
 ./install.sh            # 安装至 /Applications 并启动
 ```
 
-安装完成后，打开 **系统设置 → 隐私与安全性 → 输入监控**，开启 **DPIPeek**。macOS 要求读取底层 HID 数据必须由用户授权；授权后应用将自动开始监听。
+安装完成后，打开 **系统设置 → 隐私与安全性 → 输入监控**，开启 **HP Professor 1 DPI**。macOS 要求读取底层 HID 数据必须由用户授权；授权后应用将自动开始监听。
 
 ### B. 下载预编译打包程序
 
-1. 前往 [Releases](https://github.com/kizaki-R/hp-professor1-dpi/releases) 页面下载最新发布的 `DPIPeek-*.zip`。
-2. 解压后将 `DPIPeek.app` 拖入 `/Applications`。
+1. 前往 [Releases](https://github.com/kizaki-R/hp-professor1-dpi/releases) 页面下载最新发布的 `HP-Professor-1-DPI-macOS.dmg`（或 `.zip`）。
+2. 打开 dmg 后将 **HP Professor 1 DPI** 拖入 `/Applications`；或解压 zip 后复制过去。
 3. 首次启动时，请在应用图标上**单击右键 → 打开**（开源项目未购买商业 Apple 开发者证书公证，直接连按两次会被 Gatekeeper 拦截）。
 4. 在系统设置中授予“输入监控”权限即可。
 
@@ -113,7 +113,7 @@ cd hp-professor1-dpi
 3. **软件点击直切**：
    - 2.4G 接收器模式下，点击面板档位按钮（`800` ~ `4000`）可直接控制传感器切换速度。
    - 蓝牙模式下点击会提示使用实体按键（蓝牙固件机制为单向通知）。
-4. **开机自启**：如需开机后台运行，前往 **系统设置 → 通用 → 登录项** 添加 `DPIPeek` 即可。
+4. **开机自启**：如需开机后台运行，前往 **系统设置 → 通用 → 登录项** 添加 **HP Professor 1 DPI** 即可。
 
 ---
 
@@ -134,7 +134,7 @@ make-release.sh         打包发布用 Zip 与源代码归档
 验证指令：
 
 ```sh
-./DPIPeek.app/Contents/MacOS/DPIPeek --selftest   # 运行 12 项单元测试
+./HP\ Professor\ 1\ DPI.app/Contents/MacOS/HPProfessor1DPI --selftest   # 运行 12 项单元测试
 ./royuan auto                                     # 通用设备探测
 ./royuan status                                   # 读取 2.4G 接收器状态、电量与中继状态
 ./probe list                                      # 查看 HID Report Descriptor
@@ -146,7 +146,7 @@ make-release.sh         打包发布用 Zip 与源代码归档
 
 | 问题 | 解决方法 |
 |---|---|
-| 权限显示“被拒绝” | 进入系统设置 → 隐私与安全性 → 输入监控，开启 DPIPeek；如列表中存在失效旧项，可选中后点击 `-` 移除再重新添加。 |
+| 权限显示“被拒绝” | 进入系统设置 → 隐私与安全性 → 输入监控，开启 HP Professor 1 DPI；如列表中存在失效旧项，可选中后点击 `-` 移除再重新添加。 |
 | 蓝牙模式下点击按钮没有变换速度 | 鼠标蓝牙固件采用单向广播机制，不接收主机写入指令。如需软件点击直切，请使用 2.4G USB 接收器。 |
 | 重新编译后权限丢失 | 请先运行 `./make-identity.sh` 创建本机固定签名身份，后续编译将复用该证书，无需重复授予权限。 |
 | 状态显示“2.4G 原厂通道未连接” | 鼠标若处于蓝牙模式，或长时间未移动进入低功耗休眠，中继会暂时离线；移动唤醒鼠标或插入 2.4G 接收器即可恢复。 |
