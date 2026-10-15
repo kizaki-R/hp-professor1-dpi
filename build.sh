@@ -3,13 +3,13 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP="build.noindex/DPIPeek.app"
+APP="build.noindex/HP Professor 1 DPI.app"
 CACHE="build.noindex/mcache"
 mkdir -p build "$CACHE"
 
-echo "==> compiling DPIPeek binary"
+echo "==> compiling HPProfessor1DPI binary"
 clang -fobjc-arc -fmodules-cache-path="$CACHE" -O2 -Wall \
-    -o build/DPIPeek \
+    -o build/HPProfessor1DPI \
     src/DPIPeek.m src/HIDWatcher.m src/DPIMapper.m src/VendorChannel.m src/BLEBatteryReader.m \
     -framework Cocoa -framework IOKit -framework CoreBluetooth
 
@@ -21,7 +21,13 @@ echo "==> assembling $APP"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp src/Info.plist "$APP/Contents/Info.plist"
-cp build/DPIPeek "$APP/Contents/MacOS/DPIPeek"
+cp build/HPProfessor1DPI "$APP/Contents/MacOS/HPProfessor1DPI"
+if [ -f src/AppIcon.icns ]; then
+    cp src/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+fi
+if [ -d src/Resources ]; then
+    cp -R src/Resources/* "$APP/Contents/Resources/"
+fi
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
 # Sign with the stable local identity when it exists (run ./make-identity.sh once):
@@ -31,6 +37,7 @@ KC="$(pwd)/signing/KizakiWorks.keychain"
 SIGNED=0
 if [ -f "$KC" ]; then
     echo "==> signing with stable identity (KizakiWorks Local)"
+    security unlock-keychain -p "dpipeek" "$KC" 2>/dev/null || true
     if codesign --force --keychain "$KC" --sign "KizakiWorks Local" \
             --identifier com.kizakiworks.dpipeek "$APP" 2>/dev/null; then
         SIGNED=1

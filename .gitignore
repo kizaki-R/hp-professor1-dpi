@@ -1,9 +1,11 @@
 # build artefacts
 build/
+build.noindex/
 *.o
 probe
 royuan
 DPIPeek.app/
+HP Professor 1 DPI.app/
 dist/
 
 # local code-signing identity: NEVER commit (contains a private key)

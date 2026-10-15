@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-SRC="build.noindex/DPIPeek.app"
+SRC="build.noindex/HP Professor 1 DPI.app"
 if [ ! -d "$SRC" ]; then
     echo "$SRC not found — run ./build.sh first"
     exit 1
@@ -16,6 +16,7 @@ fi
 
 echo "==> quitting any running copy"
 pkill -TERM -f "DPIPeek.app/Contents/MacOS/DPIPeek" 2>/dev/null || true
+pkill -TERM -f "HP Professor 1 DPI.app/Contents/MacOS/HPProfessor1DPI" 2>/dev/null || true
 sleep 1
 
 DEST="/Applications"
@@ -25,11 +26,14 @@ if [ ! -w "$DEST" ]; then
     mkdir -p "$DEST"
 fi
 
-echo "==> installing to $DEST/DPIPeek.app"
+# Clean up older DPIPeek.app if present
 rm -rf "$DEST/DPIPeek.app"
+
+echo "==> installing to $DEST/HP Professor 1 DPI.app"
+rm -rf "$DEST/HP Professor 1 DPI.app"
 cp -R "$SRC" "$DEST/"
 
 echo "==> launched"
-open "$DEST/DPIPeek.app"
+open "$DEST/HP Professor 1 DPI.app"
 sleep 2
 echo "==> installed. logs: /Applications/logs/  (or ~/Library/Logs/DPIPeek/ if not writable)"

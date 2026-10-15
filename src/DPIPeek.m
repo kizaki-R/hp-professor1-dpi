@@ -154,6 +154,7 @@ static NSString *timeString(NSDate *d) {
 @property (nonatomic, strong) MenuBarPanel *window;
 @property (nonatomic, strong) NSView *container;
 @property (nonatomic, strong) NSVisualEffectView *effectView;
+@property (nonatomic, strong) NSImageView *logoView;
 @property (nonatomic, strong) NSTextField *titleLabel;
 @property (nonatomic, strong) NSTextField *badgeLabel;
 @property (nonatomic, strong) NSButton *pinCheck;
@@ -163,49 +164,27 @@ static NSString *timeString(NSDate *d) {
 @property (nonatomic) NSTimeInterval lastCloseTime;
 @property (nonatomic) NSInteger currentTheme; // 0=Auto, 1=Light, 2=Dark
 
-@property (nonatomic, strong) NSTextView *logView;
-@property (nonatomic, strong) NSScrollView *logScroll;
 @property (nonatomic, strong) NSTextField *accessLabel;
 @property (nonatomic, strong) NSTextField *deviceLabel;
-@property (nonatomic, strong) NSButton *vendorOnlyCheck;
 @property (nonatomic, strong) NSSegmentedControl *dpiSegments;
 @property (nonatomic, strong) NSTextField *presetsLabel;
 
 @property (nonatomic, strong) NSTextField *themeLabel;
 @property (nonatomic, strong) NSSegmentedControl *themeSegments;
-@property (nonatomic, strong) NSButton *advancedCheck;
 @property (nonatomic, strong) NSButton *testHudBtn;
 
 @property (nonatomic, strong) NSArray *permRow;
-@property (nonatomic, strong) NSArray *monitorRow;
-@property (nonatomic, strong) NSArray *vendorRow;
-@property (nonatomic, strong) NSArray *logClearRow;
-@property (nonatomic, strong) NSArray *measureRow;
-@property (nonatomic, strong) NSArray *hexRow;
-@property (nonatomic, strong) NSMutableArray *advancedViews;
-@property (nonatomic) BOOL advancedMode;
-
-@property (nonatomic, strong) NSTextField *measureCaption;
-@property (nonatomic, strong) NSTextField *distanceField;
-@property (nonatomic, strong) NSTextField *cmLabel;
-@property (nonatomic, strong) NSTextField *measureLabel;
-@property (nonatomic, strong) NSTextField *hexLabel;
-@property (nonatomic, strong) NSTextField *hexField;
 
 @property (nonatomic, strong) HIDWatcher *watcher;
 @property (nonatomic, strong) VendorChannel *vendor;
 @property (nonatomic, strong) DPIMapper *mapper;
 @property (nonatomic, strong) NSFileHandle *logFile;
 @property (nonatomic, copy) NSString *logPath;
-@property (nonatomic) NSInteger burstCount;
-@property (nonatomic) NSTimeInterval burstSecond;
-@property (nonatomic) BOOL measuring;
-@property (nonatomic) double measureCounts;
 @property (nonatomic, strong) NSData *lastVendorPayload;
 @property (nonatomic) NSTimeInterval lastVendorTime;
-@property (nonatomic) double measuredDPI;
 @property (nonatomic, strong) id<NSObject> activity;
 @property (nonatomic, strong) BLEBatteryReader *bleBattery;
+@property (nonatomic) int cachedBattery;
 @end
 
 @implementation AppDelegate
@@ -218,8 +197,6 @@ static NSString *timeString(NSDate *d) {
 
     self.watcher = [HIDWatcher new];
     self.mapper = [DPIMapper loadFromDefaults];
-    self.advancedViews = [NSMutableArray array];
-    self.advancedMode = [NSUserDefaults.standardUserDefaults boolForKey:@"DPIPeek.advancedMode"];
     self.pinned = [NSUserDefaults.standardUserDefaults boolForKey:@"DPIPeek.pinned"];
     self.currentTheme = [NSUserDefaults.standardUserDefaults integerForKey:@"DPIPeek.theme"]; // 0=Auto, 1=Light, 2=Dark
 
@@ -252,7 +229,7 @@ static NSString *timeString(NSDate *d) {
 
     [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(permissionTick:) userInfo:nil repeats:YES];
 
-    [self appendLog:@"DPI Peek 啟動。"];
+    [self appendLog:@"HP Professor 1 DPI 啟動。"];
     [self appendLog:[NSString stringWithFormat:@"記錄檔：%@", self.logPath]];
     for (HIDInterfaceInfo *i in [self.watcher scan]) {
         [self appendLog:[NSString stringWithFormat:@"找到介面 #%lu %@", (unsigned long)i.index, [i summary]]];
@@ -295,10 +272,10 @@ static NSString *timeString(NSDate *d) {
 
 - (void)showPermissionAlert {
     NSAlert *a = [NSAlert new];
-    a.messageText = @"DPI Peek 需要「輸入監控」權限";
+    a.messageText = @"HP Professor 1 DPI 需要「輸入監控」權限";
     a.informativeText = @"macOS 規定：任何程式要讀取滑鼠的 HID 資料，都必須由你手動授權。\n\n"
                         @"1. 按下方「開啟系統設定」\n"
-                        @"2. 到「隱私權與安全性 → 輸入監控」，把 DPIPeek 打開（沒有列出就按 + 加入本 App）\n"
+                        @"2. 到「隱私權與安全性 → 輸入監控」，把 HP Professor 1 DPI 打開（沒有列出就按 + 加入本 App）\n"
                         @"3. 回來按「重新檢查權限」（若仍失敗，請結束 App 再重新開啟）";
     [a addButtonWithTitle:@"開啟系統設定"];
     [a addButtonWithTitle:@"重新檢查權限"];
@@ -333,11 +310,34 @@ static NSString *timeString(NSDate *d) {
 
 - (void)buildMenuBar {
     self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
-    self.statusItem.button.title = @"DPI";
-    self.statusItem.button.toolTip = @"DPI Peek — 點擊切換面板";
+    self.statusItem.button.imagePosition = NSImageLeft;
+    self.statusItem.button.toolTip = @"HP Professor 1 DPI — 點擊切換面板";
     self.statusItem.button.target = self;
     self.statusItem.button.action = @selector(statusItemClicked:);
     [self.statusItem.button sendActionOn:NSEventMaskLeftMouseUp | NSEventMaskRightMouseUp];
+    [self updateMenuBarDisplayWithStep:self.mapper.currentStep battery:-1];
+}
+
+- (void)updateMenuBarDisplayWithStep:(NSInteger)step battery:(int)batt {
+    NSStatusBarButton *btn = self.statusItem.button;
+    if (!btn) return;
+
+    // Load VELOCITY stage icon (1..7) or fallback
+    int stage = (int)step + 1; // step 0..6 -> stage 1..7
+    if (stage < 1 || stage > 7) stage = 1;
+    NSString *iconName = [NSString stringWithFormat:@"menu_stage_%d", stage];
+    NSImage *img = [NSImage imageNamed:iconName] ?: [[NSBundle mainBundle] imageForResource:iconName];
+    if (img) {
+        img.template = YES; // Adapts smoothly to macOS dark/light menu bar
+        img.size = NSMakeSize(20, 16);
+        btn.image = img;
+    }
+
+    if (batt > 0 && batt <= 100) {
+        btn.title = [NSString stringWithFormat:@" %d%%", batt];
+    } else {
+        btn.title = @"";
+    }
 }
 
 - (void)statusItemClicked:(id)sender {
@@ -430,7 +430,7 @@ static NSString *timeString(NSDate *d) {
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification {
-    if (self.pinned || self.measuring) return;
+    if (self.pinned) return;
     [self closePanel];
 }
 
@@ -444,9 +444,9 @@ static NSString *timeString(NSDate *d) {
     NSMenuItem *appItem = [NSMenuItem new];
     [menubar addItem:appItem];
     NSMenu *appMenu = [NSMenu new];
-    [appMenu addItemWithTitle:@"關於 DPI Peek" action:@selector(orderFrontStandardAboutPanel:) keyEquivalent:@""];
+    [appMenu addItemWithTitle:@"關於 HP Professor 1 DPI" action:@selector(orderFrontStandardAboutPanel:) keyEquivalent:@""];
     [appMenu addItem:NSMenuItem.separatorItem];
-    [appMenu addItemWithTitle:@"結束 DPI Peek" action:@selector(terminate:) keyEquivalent:@"q"];
+    [appMenu addItemWithTitle:@"結束 HP Professor 1 DPI" action:@selector(terminate:) keyEquivalent:@"q"];
     appItem.submenu = appMenu;
     NSApp.mainMenu = menubar;
 }
@@ -474,7 +474,7 @@ static NSString *timeString(NSDate *d) {
                                                   styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel
                                                     backing:NSBackingStoreBuffered
                                                       defer:NO];
-    self.window.title = @"DPI Peek — HP Professor 1";
+    self.window.title = @"HP Professor 1 DPI";
     self.window.level = NSFloatingWindowLevel;
     self.window.opaque = NO;
     self.window.backgroundColor = [NSColor clearColor];
@@ -503,11 +503,18 @@ static NSString *timeString(NSDate *d) {
 
     NSView *cv = self.container;
 
-    // Header Bar
-    self.titleLabel = [self label:@"DPI Peek" x:14 w:68 y:0 size:13 bold:YES];
+    // Header Bar: VELOCITY Logo + Title + Mode Badge + Pin + Quit
+    NSImage *logo = [NSImage imageNamed:@"logo_mark"];
+    if (!logo) logo = [[NSBundle mainBundle] imageForResource:@"logo_mark"];
+    self.logoView = [[NSImageView alloc] initWithFrame:NSMakeRect(14, 0, 20, 20)];
+    self.logoView.image = logo;
+    self.logoView.imageScaling = NSImageScaleProportionallyUpOrDown;
+    [cv addSubview:self.logoView];
+
+    self.titleLabel = [self label:@"HP Professor 1 DPI" x:38 w:136 y:0 size:12 bold:YES];
     [cv addSubview:self.titleLabel];
 
-    self.badgeLabel = [self label:@"2.4G 4000 DPI" x:84 w:136 y:0 size:10 bold:NO];
+    self.badgeLabel = [self label:@"2.4G 4000 DPI" x:178 w:110 y:0 size:9.5 bold:NO];
     self.badgeLabel.textColor = [NSColor secondaryLabelColor];
     [cv addSubview:self.badgeLabel];
 
@@ -583,99 +590,6 @@ static NSString *timeString(NSDate *d) {
     self.testHudBtn.font = [NSFont systemFontOfSize:11];
     [cv addSubview:self.testHudBtn];
 
-    // Advanced Checkbox
-    self.advancedCheck = [NSButton checkboxWithTitle:@"進階模式（除錯 · 量測）" target:self action:@selector(toggleAdvanced:)];
-    self.advancedCheck.font = [NSFont systemFontOfSize:11];
-    self.advancedCheck.state = self.advancedMode ? NSControlStateValueOn : NSControlStateValueOff;
-    [cv addSubview:self.advancedCheck];
-
-    // Advanced Section - Operations
-    NSButton *startBtn = [self button:@"監看" action:@selector(startMonitoring:) x:0 w:52 y:0];
-    NSButton *stopBtn = [self button:@"停止" action:@selector(stopMonitoring:) x:0 w:48 y:0];
-    NSButton *reconnectBtn = [self button:@"重連" action:@selector(redetectPressed:) x:0 w:52 y:0];
-    NSButton *readBtn = [self button:@"讀取原廠表" action:@selector(readVendorTable:) x:0 w:84 y:0];
-    NSButton *rescanBtn = [self button:@"重新掃描" action:@selector(rescan:) x:0 w:70 y:0];
-    startBtn.font = stopBtn.font = reconnectBtn.font = readBtn.font = rescanBtn.font = [NSFont systemFontOfSize:10];
-    [cv addSubview:startBtn]; [cv addSubview:stopBtn]; [cv addSubview:reconnectBtn]; [cv addSubview:readBtn]; [cv addSubview:rescanBtn];
-    self.monitorRow = @[startBtn, stopBtn, reconnectBtn, readBtn, rescanBtn];
-
-    // Advanced Section - Log Tools
-    NSButton *clearBtn = [self button:@"清除記錄" action:@selector(clearLog:) x:0 w:68 y:0];
-    NSButton *folderBtn = [self button:@"開啟記錄檔" action:@selector(openLogFolder:) x:0 w:80 y:0];
-    clearBtn.font = folderBtn.font = [NSFont systemFontOfSize:10];
-    [cv addSubview:clearBtn]; [cv addSubview:folderBtn];
-    self.logClearRow = @[clearBtn, folderBtn];
-
-    self.vendorOnlyCheck = [NSButton checkboxWithTitle:@"只記廠商通道" target:nil action:nil];
-    self.vendorOnlyCheck.toolTip = @"只記錄廠商通道 (Report ID 6)";
-    self.vendorOnlyCheck.font = [NSFont systemFontOfSize:10];
-    self.vendorOnlyCheck.state = NSControlStateValueOn;
-    [cv addSubview:self.vendorOnlyCheck];
-
-    // Advanced Section - Calibration
-    self.measureCaption = [self label:@"實測：移動" x:0 w:62 y:0 size:10 bold:NO];
-    [cv addSubview:self.measureCaption];
-
-    self.distanceField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 32, 20)];
-    self.distanceField.stringValue = @"10";
-    self.distanceField.alignment = NSTextAlignmentCenter;
-    self.distanceField.font = [NSFont systemFontOfSize:10];
-    [cv addSubview:self.distanceField];
-
-    self.cmLabel = [self label:@"cm" x:0 w:18 y:0 size:10 bold:NO];
-    [cv addSubview:self.cmLabel];
-
-    NSButton *measureBtn = [self button:@"開始量測" action:@selector(startMeasure:) x:0 w:66 y:0];
-    NSButton *applyBtn = [self button:@"套用目前段" action:@selector(applyMeasure:) x:0 w:78 y:0];
-    measureBtn.font = applyBtn.font = [NSFont systemFontOfSize:10];
-    [cv addSubview:measureBtn]; [cv addSubview:applyBtn];
-
-    self.measureLabel = [self label:@"（選段 → 沿尺水平移動）" x:0 w:130 y:0 size:9 bold:NO];
-    self.measureLabel.textColor = [NSColor secondaryLabelColor];
-    [cv addSubview:self.measureLabel];
-
-    self.measureRow = @[self.measureCaption, self.distanceField, self.cmLabel, measureBtn, applyBtn, self.measureLabel];
-
-    // Advanced Section - Hex Sender
-    self.hexLabel = [self label:@"自訂封包：" x:0 w:62 y:0 size:10 bold:NO];
-    [cv addSubview:self.hexLabel];
-
-    self.hexField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 226, 20)];
-    self.hexField.placeholderString = @"06 00 00 …";
-    self.hexField.font = [NSFont monospacedSystemFontOfSize:9 weight:NSFontWeightRegular];
-    [cv addSubview:self.hexField];
-
-    NSButton *sendBtn = [self button:@"送出" action:@selector(sendHex:) x:0 w:48 y:0];
-    sendBtn.font = [NSFont systemFontOfSize:10];
-    [cv addSubview:sendBtn];
-
-    self.hexRow = @[self.hexLabel, self.hexField, sendBtn];
-
-    // Advanced Section - Live Log View
-    NSScrollView *sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(14, 12, 352, 220)];
-    sv.hasVerticalScroller = YES;
-    sv.borderType = NSBezelBorder;
-    sv.autoresizingMask = NSViewNotSizable;
-    NSTextView *tv = [[NSTextView alloc] initWithFrame:sv.bounds];
-    tv.editable = NO;
-    tv.font = [NSFont monospacedSystemFontOfSize:9.5 weight:NSFontWeightRegular];
-    tv.autoresizingMask = NSViewNotSizable;
-    tv.verticallyResizable = YES;
-    tv.horizontallyResizable = NO;
-    tv.textContainer.widthTracksTextView = YES;
-    tv.maxSize = NSMakeSize(FLT_MAX, FLT_MAX);
-    sv.documentView = tv;
-    self.logView = tv;
-    self.logScroll = sv;
-    [cv addSubview:sv];
-
-    [self.advancedViews addObjectsFromArray:self.monitorRow];
-    [self.advancedViews addObjectsFromArray:self.logClearRow];
-    [self.advancedViews addObject:self.vendorOnlyCheck];
-    [self.advancedViews addObjectsFromArray:self.measureRow];
-    [self.advancedViews addObjectsFromArray:self.hexRow];
-    [self.advancedViews addObject:self.logScroll];
-
     [self applyAdvancedMode:NO];
 }
 
@@ -712,10 +626,11 @@ static NSString *timeString(NSDate *d) {
 
     // Header bar
     y -= 22.0;
-    self.titleLabel.frame = NSMakeRect(14.0, y + 2.0, 68.0, 18.0);
-    self.badgeLabel.frame = NSMakeRect(84.0, y + 2.0, 140.0, 16.0);
-    self.pinCheck.frame = NSMakeRect(228.0, y + 1.0, 80.0, 20.0);
-    self.quitBtn.frame = NSMakeRect(314.0, y - 1.0, 52.0, 24.0);
+    self.logoView.frame = NSMakeRect(14.0, y, 20.0, 20.0);
+    self.titleLabel.frame = NSMakeRect(38.0, y + 2.0, 136.0, 18.0);
+    self.badgeLabel.frame = NSMakeRect(178.0, y + 2.0, 110.0, 16.0);
+    self.pinCheck.frame = NSMakeRect(268.0, y + 1.0, 52.0, 20.0);
+    self.quitBtn.frame = NSMakeRect(322.0, y - 1.0, 44.0, 24.0);
 
     y -= 6.0;
     self.headerSeparator.frame = NSMakeRect(14.0, y, 352.0, 1.0);
@@ -743,46 +658,15 @@ static NSString *timeString(NSDate *d) {
     self.dpiSegments.frame = NSMakeRect(14.0, y, 352.0, 26.0);
 
     // Theme Switcher Row (Auto / Light / Dark)
-    y -= 26.0;
+    y -= 28.0;
     self.themeLabel.frame = NSMakeRect(14.0, y + 2.0, 38.0, 18.0);
     self.themeSegments.frame = NSMakeRect(54.0, y, 215.0, 22.0);
     self.testHudBtn.frame = NSMakeRect(284.0, y, 82.0, 24.0);
-
-    // Mode Toggle row
-    y -= 26.0;
-    self.advancedCheck.frame = NSMakeRect(14.0, y + 2.0, 240.0, 20.0);
-
-    if (!self.advancedMode) {
-        return;
-    }
-
-    // Advanced Section
-    y -= 30.0;
-    [self placeRow:self.monitorRow y:y widths:@[@52, @48, @52, @84, @70] gap:5 left:14];
-
-    y -= 26.0;
-    [self placeRow:self.logClearRow y:y widths:@[@68, @80] gap:6 left:14];
-    self.vendorOnlyCheck.frame = NSMakeRect(174.0, y + 2.0, 140.0, 18.0);
-
-    y -= 26.0;
-    [self placeRow:self.measureRow y:y widths:@[@62, @32, @18, @66, @78, @70] gap:5 left:14];
-
-    y -= 26.0;
-    [self placeRow:self.hexRow y:y widths:@[@62, @226, @48] gap:5 left:14];
-
-    y -= 6.0;
-    CGFloat logH = MAX(140.0, y - 12.0);
-    self.logScroll.frame = NSMakeRect(14.0, 12.0, 352.0, logH);
 }
 
 - (void)applyAdvancedMode:(BOOL)animate {
-    [NSUserDefaults.standardUserDefaults setBool:self.advancedMode forKey:@"DPIPeek.advancedMode"];
-    NSControlStateValue st = self.advancedMode ? NSControlStateValueOn : NSControlStateValueOff;
-    self.advancedCheck.state = st;
-    for (NSView *v in self.advancedViews) v.hidden = !self.advancedMode;
-
     BOOL hasPermWarning = ([self.watcher accessState] != HIDAccessGranted);
-    CGFloat targetH = self.advancedMode ? 630.0 : (hasPermWarning ? 255.0 : 225.0);
+    CGFloat targetH = hasPermWarning ? 220.0 : 190.0;
 
     NSRect curFrame = self.window.frame;
     CGFloat curTop = NSMaxY(curFrame);
@@ -790,12 +674,6 @@ static NSString *timeString(NSDate *d) {
     [self.window setFrame:newFrame display:YES animate:animate];
 
     [self layoutContent];
-}
-
-- (void)toggleAdvanced:(id)sender {
-    (void)sender;
-    self.advancedMode = !self.advancedMode;
-    [self applyAdvancedMode:YES];
 }
 
 // MARK: - Theme Switching
@@ -818,6 +696,11 @@ static NSString *timeString(NSDate *d) {
     } else { // Auto (Follow system)
         self.window.appearance = nil;
     }
+
+    BOOL isDark = [self.window.effectiveAppearance.name containsString:@"Dark"];
+    NSString *logoName = isDark ? @"logo_mark" : @"logo_mark_light";
+    NSImage *logo = [NSImage imageNamed:logoName] ?: [[NSBundle mainBundle] imageForResource:logoName];
+    if (logo) self.logoView.image = logo;
 
     self.container.layer.borderColor = [NSColor separatorColor].CGColor;
     [self refreshStatus];
@@ -889,23 +772,25 @@ static NSString *timeString(NSDate *d) {
     BOOL vendorActive = self.vendor.isReady && self.vendor.isMouseLinked;
     if (vendorActive) {
         int batt = [self.vendor readBatteryPercent];
+        if (batt > 0 && batt <= 100) {
+            self.cachedBattery = batt;
+        } else if (self.cachedBattery > 0) {
+            batt = self.cachedBattery;
+        }
         NSString *battBadge = @"";
         if (batt > 0 && batt <= 100) {
             battBadge = [NSString stringWithFormat:@" · %s %d%%", (batt <= 20 ? "🪫" : "🔋"), batt];
-            self.statusItem.button.title = [NSString stringWithFormat:@"DPI %d%%", batt];
-        } else {
-            self.statusItem.button.title = @"DPI";
         }
+        [self updateMenuBarDisplayWithStep:self.mapper.currentStep battery:batt];
         modeText = [NSString stringWithFormat:@"2.4G · %@%@", dpiText.length ? dpiText : @"4000 DPI", battBadge];
         self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：%@ ｜ 原廠 2.4G 通道 (0xD4)%@",
                                         self.vendor.deviceName,
                                         (batt > 0 ? [NSString stringWithFormat:@" ｜ 電量：%d%%", batt] : @"")];
         self.presetsLabel.stringValue = @"DPI 段數（2.4G 可點擊直切）：";
-        self.statusItem.button.toolTip = [NSString stringWithFormat:@"DPI Peek — HP Professor 1 (2.4G · %@%@)",
+        self.statusItem.button.toolTip = [NSString stringWithFormat:@"HP Professor 1 DPI (2.4G · %@%@)",
                                           dpiText.length ? dpiText : @"4000 DPI",
                                           (batt > 0 ? [NSString stringWithFormat:@" · 電量 %d%%", batt] : @"")];
     } else {
-        self.statusItem.button.title = @"DPI";
         NSArray *ifs = self.watcher.interfaces;
         BOOL hasBLE = NO;
         for (HIDInterfaceInfo *i in ifs) {
@@ -915,26 +800,30 @@ static NSString *timeString(NSDate *d) {
         }
         if (hasBLE) {
             int batt = self.bleBattery.batteryPercent;
+            if (batt > 0 && batt <= 100) {
+                self.cachedBattery = batt;
+            } else if (self.cachedBattery > 0) {
+                batt = self.cachedBattery;
+            }
             NSString *battBadge = @"";
             if (batt > 0 && batt <= 100) {
                 battBadge = [NSString stringWithFormat:@" · %s %d%%", (batt <= 20 ? "🪫" : "🔋"), batt];
-                self.statusItem.button.title = [NSString stringWithFormat:@"DPI %d%%", batt];
-            } else {
-                self.statusItem.button.title = @"DPI";
             }
+            [self updateMenuBarDisplayWithStep:self.mapper.currentStep battery:batt];
             modeText = [NSString stringWithFormat:@"藍牙 · %@%@", dpiText.length ? dpiText : @"已連線", battBadge];
             self.deviceLabel.stringValue = [NSString stringWithFormat:@"裝置：藍牙監看中 (%lu 介面)%@",
                                             (unsigned long)ifs.count,
                                             (batt > 0 ? [NSString stringWithFormat:@" ｜ 電量：%d%%", batt] : @"")];
             self.presetsLabel.stringValue = @"目前 DPI 段數（藍牙模式請按滑鼠實體鍵切換）：";
-            self.statusItem.button.toolTip = [NSString stringWithFormat:@"DPI Peek — HP Professor 1 (藍牙 · %@%@)",
+            self.statusItem.button.toolTip = [NSString stringWithFormat:@"HP Professor 1 DPI (藍牙 · %@%@)",
                                               dpiText.length ? dpiText : @"已連線",
                                               (batt > 0 ? [NSString stringWithFormat:@" · 電量 %d%%", batt] : @"")];
         } else {
+            [self updateMenuBarDisplayWithStep:0 battery:-1];
             modeText = @"未連線";
             self.deviceLabel.stringValue = @"裝置：等待滑鼠連線…";
             self.presetsLabel.stringValue = @"DPI 段數（未連線）：";
-            self.statusItem.button.toolTip = @"DPI Peek — 未連線";
+            self.statusItem.button.toolTip = @"HP Professor 1 DPI — 未連線";
         }
     }
     self.badgeLabel.stringValue = modeText;
@@ -954,10 +843,6 @@ static NSString *timeString(NSDate *d) {
     self.badgeLabel.textColor = [NSColor secondaryLabelColor];
     self.presetsLabel.textColor = [NSColor labelColor];
     self.themeLabel.textColor = [NSColor labelColor];
-    self.measureCaption.textColor = [NSColor labelColor];
-    self.cmLabel.textColor = [NSColor labelColor];
-    self.measureLabel.textColor = [NSColor secondaryLabelColor];
-    self.hexLabel.textColor = [NSColor labelColor];
 
     [self layoutContent];
 }
@@ -981,15 +866,6 @@ static NSString *timeString(NSDate *d) {
 
 - (void)appendLog:(NSString *)line {
     void (^work)(void) = ^{
-        NSAttributedString *attr = [[NSAttributedString alloc] initWithString:line attributes:@{
-            NSFontAttributeName: [NSFont monospacedSystemFontOfSize:10 weight:NSFontWeightRegular],
-            NSForegroundColorAttributeName: [NSColor labelColor],
-        }];
-        NSTextStorage *storage = self.logView.textStorage;
-        [storage appendAttributedString:attr];
-        [storage appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"]];
-        if (storage.length > 200000) [storage deleteCharactersInRange:NSMakeRange(0, storage.length - 150000)];
-        [self.logView scrollRangeToVisible:NSMakeRange(storage.length, 0)];
         NSData *lineData = [[line stringByAppendingString:@"\n"] dataUsingEncoding:NSUTF8StringEncoding];
         [self.logFile writeData:lineData];
         [self.logFile synchronizeFile];
@@ -1053,81 +929,36 @@ static NSString *timeString(NSDate *d) {
     [self refreshStatus];
 }
 
-- (void)redetectPressed:(id)sender {
-    (void)sender;
-    [self.vendor close];
-    [self connectVendorChannel];
-}
-
-- (void)readVendorTable:(id)sender {
-    (void)sender;
-    if (!self.vendor.isReady) {
-        [self appendLog:@"尚未連上原廠通道，嘗試連線…"];
-        [self connectVendorChannel];
-    }
-    if (!self.vendor.isReady) {
-        [self appendLog:@"✘ 找不到 HP Professor 1 的原廠通道：請切到 2.4G / 有線模式，或動一下滑鼠喚醒。"];
-        return;
-    }
-    int count = 0, active = -1;
-    NSArray<NSNumber *> *values = [self.vendor readDPITableWithCount:&count active:&active];
-    if (!values) { [self appendLog:@"✘ 讀取失敗（滑鼠可能睡著了，動一下再試）。"]; return; }
-    [self handleVendorDPIWithCount:count active:active values:values];
-}
-
 // MARK: - HID handling
 
 - (void)handleReport:(HIDInterfaceInfo *)iface reportID:(uint32_t)reportID payload:(NSData *)payload when:(NSDate *)when {
     NSData *copy = [payload copy];
     uint32_t rid = reportID;
-    NSString *ifaceName = iface.product ?: @"?";
     NSTimeInterval ts = when.timeIntervalSince1970;
 
-    if (rid == 5 || rid == 0) {                      // raw mouse report (BLE id 5 / dongle id 0)
-        if (self.measuring && copy.length >= 5) {
-            const uint8_t *b = copy.bytes;
-            int16_t dx = (int16_t)(b[1] | (b[2] << 8));
-            int16_t dy = (int16_t)(b[3] | (b[4] << 8));
-            double step = hypot((double)dx, (double)dy);
-            dispatch_async(dispatch_get_main_queue(), ^{
-                self.measureCounts += step;
-                self.measureLabel.stringValue = [NSString stringWithFormat:@"量測中… 累計 %.0f counts", self.measureCounts];
-            });
-        }
-        return;
-    }
+    if (rid != 6) return;
 
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (rid == 6) {
-            NSInteger step = [DPIMapper stepFromVendorPayload:copy];
-            BOOL duplicate = (self.lastVendorPayload && [self.lastVendorPayload isEqualToData:copy] &&
-                              (ts - self.lastVendorTime) < 0.15);
-            self.lastVendorPayload = copy;
-            self.lastVendorTime = ts;
-            if (duplicate) return;
+        NSInteger step = [DPIMapper stepFromVendorPayload:copy];
+        BOOL duplicate = (self.lastVendorPayload && [self.lastVendorPayload isEqualToData:copy] &&
+                          (ts - self.lastVendorTime) < 0.15);
+        self.lastVendorPayload = copy;
+        self.lastVendorTime = ts;
+        if (duplicate) return;
 
-            if (step >= 0) {
-                self.mapper.currentStep = step;
-                NSString *title = [self.mapper hudTitleForStep:step];
-                NSString *subtitle = [self.mapper hudSubtitleForStep:step];
-                [HUDWindow.sharedHUD showTitle:title subtitle:subtitle];
-                [self appendLog:[NSString stringWithFormat:@"%@ [DPI] 第 %ld 段 → %@  (%@)",
-                                 timeString(when), (long)(step + 1), title, hexString(copy)]];
-                [self refreshStatus];
-            } else {
-                const uint8_t *b = copy.bytes;
-                BOOL noise = (copy.length >= 2 && b[0] == 0x66 && b[1] == 0x0F);
-                if (!noise) {
-                    [self appendLog:[NSString stringWithFormat:@"%@ [vendor] %@", timeString(when), hexString(copy)]];
-                }
-            }
-        } else if (self.vendorOnlyCheck.state == NSControlStateValueOff) {
-            if (ts - self.burstSecond >= 1.0) { self.burstSecond = ts; self.burstCount = 0; }
-            if (self.burstCount++ < 20) {
-                [self appendLog:[NSString stringWithFormat:@"%@ [%@] ID=%u %luB  %@",
-                                 timeString(when), ifaceName, rid, (unsigned long)copy.length, hexString(copy)]];
-            } else if (self.burstCount == 21) {
-                [self appendLog:@"…（其餘同類報告省略）"];
+        if (step >= 0) {
+            self.mapper.currentStep = step;
+            NSString *title = [self.mapper hudTitleForStep:step];
+            NSString *subtitle = [self.mapper hudSubtitleForStep:step];
+            [HUDWindow.sharedHUD showTitle:title subtitle:subtitle];
+            [self appendLog:[NSString stringWithFormat:@"%@ [DPI] 第 %ld 段 → %@  (%@)",
+                             timeString(when), (long)(step + 1), title, hexString(copy)]];
+            [self refreshStatus];
+        } else {
+            const uint8_t *b = copy.bytes;
+            BOOL noise = (copy.length >= 2 && b[0] == 0x66 && b[1] == 0x0F);
+            if (!noise) {
+                [self appendLog:[NSString stringWithFormat:@"%@ [vendor] %@", timeString(when), hexString(copy)]];
             }
         }
     });
@@ -1184,91 +1015,11 @@ static NSString *timeString(NSDate *d) {
     [self refreshStatus];
 }
 
-- (void)clearLog:(id)sender {
-    (void)sender;
-    self.logView.string = @"";
-}
-
-- (void)openLogFolder:(id)sender {
-    (void)sender;
-    [NSWorkspace.sharedWorkspace selectFile:self.logPath inFileViewerRootedAtPath:self.logPath.stringByDeletingLastPathComponent];
-}
-
-- (void)startMeasure:(id)sender {
-    (void)sender;
-    if (self.mapper.currentStep < 0) {
-        NSAlert *a = [NSAlert new];
-        a.messageText = @"請先按一下 DPI 鍵";
-        a.informativeText = @"先切到想量測的那一段，再開始量測。";
-        [a runModal];
-        return;
-    }
-    self.measuring = YES;
-    self.measureCounts = 0;
-    self.measureLabel.stringValue = @"量測中… 累計 0 counts";
-    [self appendLog:[NSString stringWithFormat:@"開始量測第 %ld 段：請沿直尺水平移動 %@ cm（慢速、直線）",
-                     (long)(self.mapper.currentStep + 1), self.distanceField.stringValue]];
-}
-
-- (void)applyMeasure:(id)sender {
-    double cm = self.distanceField.doubleValue;
-    if (cm <= 0) cm = 10.0;
-    if (!self.measuring && self.measureCounts <= 0) {
-        [self appendLog:@"尚未量測：請先按「開始量測」，再移動滑鼠。"];
-        return;
-    }
-    self.measuring = NO;
-    double inches = cm / 2.54;
-    double dpi = self.measureCounts / inches;
-    self.measuredDPI = dpi;
-    NSInteger rounded = (NSInteger)(round(dpi / 25.0) * 25.0);
-    NSInteger step = MAX(self.mapper.currentStep, 0);
-    [self.mapper setPreset:@(rounded) forStep:step];
-    [self.mapper save];
-    self.measureLabel.stringValue = [NSString stringWithFormat:@"≈ %ld DPI", (long)rounded];
-    [self appendLog:[NSString stringWithFormat:@"量測結果：%.1f counts / %.2f in = %.0f DPI → 第 %ld 段取 %ld",
-                     self.measureCounts, inches, dpi, (long)(step + 1), (long)rounded]];
-    self.measureCounts = 0;
-    [self refreshStatus];
-}
-
 - (void)testHUD:(id)sender {
     (void)sender;
     NSInteger step = self.mapper.currentStep >= 0 ? self.mapper.currentStep : 2;
     [HUDWindow.sharedHUD showTitle:[self.mapper hudTitleForStep:step]
                           subtitle:[self.mapper hudSubtitleForStep:step]];
-}
-
-- (void)sendHex:(id)sender {
-    (void)sender;
-    NSString *raw = self.hexField.stringValue;
-    NSCharacterSet *hexSet = [NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"];
-    NSMutableString *clean = [NSMutableString string];
-    for (NSUInteger i = 0; i < raw.length; i++) {
-        unichar c = [raw characterAtIndex:i];
-        if ([hexSet characterIsMember:c]) [clean appendFormat:@"%C", c];
-    }
-    if (clean.length < 2 || clean.length % 2 != 0) {
-        [self appendLog:@"✘ 封包格式錯誤：請輸入偶數個 hex 字元，第一 byte 是 Report ID（例如 06 66 0C 00 …）"];
-        return;
-    }
-    NSMutableData *data = [NSMutableData data];
-    for (NSUInteger i = 0; i < clean.length; i += 2) {
-        unsigned int v = 0;
-        [[NSScanner scannerWithString:[clean substringWithRange:NSMakeRange(i, 2)]] scanHexInt:&v];
-        uint8_t byte = (uint8_t)v;
-        [data appendBytes:&byte length:1];
-    }
-    HIDInterfaceInfo *target = nil;
-    for (HIDInterfaceInfo *i in self.watcher.interfaces) {
-        if (i.maxOutputReportSize > 0) { target = i; if (i.vendorChannel) break; }
-    }
-    if (!target) { [self appendLog:@"✘ 沒有可寫入的介面（請先按「開始監看」）"]; return; }
-    if (data.length < (NSUInteger)target.maxOutputReportSize) [data setLength:(NSUInteger)target.maxOutputReportSize];
-    NSString *err = nil;
-    BOOL ok = [self.watcher sendOutputReport:data toInterface:target error:&err];
-    [self appendLog:[NSString stringWithFormat:@"%@ 送出封包 → %@ : %@", ok ? @"✔" : @"✘",
-                     [target summary], ok ? hexString(data) : err]];
 }
 
 @end
