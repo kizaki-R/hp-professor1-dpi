@@ -1,5 +1,5 @@
-﻿SEVEN SHIFT colors for the Mac app.
+SEVEN SHIFT colors for the Mac app.
 
-Keep these for appearance work: dark, light, transparent mark, mono, menu-bar template, and stage_1 through stage_7.
+Superseded by VELOCITY in assets/logo/velocity/. Both platforms now draw the VELOCITY mark. This set is kept only so older builds still have their artwork; nothing loads it at runtime.
 
-Windows does not load these files at runtime. Its tray and HUD bars are an even-pitch, same-slope redraw baked into windows/dpi-peek/src/logo_icons.rs. The SVG spacing here is the original pack and does not match that redraw.
+The Windows tray and HUD bars are baked into windows/dpi-peek/src/logo_icons.rs by windows/dpi-peek/gen_icons.py, which reads the VELOCITY SVGs directly.

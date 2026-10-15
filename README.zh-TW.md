@@ -19,7 +19,9 @@ Windows 這支沒有簽章。SmartScreen 會擋，畫面上先只有「不要執
 
 介面跟著 Windows 顯示語言。右鍵工作列圖示可以改成繁體中文、简体中文或 English。2.4G 可以在面板點數字切段；藍牙只能按滑鼠上的 DPI 鍵，軟體下不去指令。
 
-圖示配色在 `assets/logo/seven/`，留給 Mac。深色、淺色、選單列模板、七檔青色都在那。Windows 現在畫面上的七條斜線是等距、同斜率的重畫版，跟素材包原 SVG 的間距不一樣。
+完整的品牌素材在 `assets/logo/velocity/`，Mac 的 icns 與 MenuBar 模板都從那裡拿。
+
+Windows 端是照 VELOCITY 的 SVG 座標重畫的，不是描圖：七條遞增斜線、間距 44、線寬 29、斜率固定 0.24。所以 Mac 和 Windows 畫出來是同一個形狀，連七段配色也一樣——當前段 `#39D5FF`、之前的段 `#F3F7FF`、之後的段 `#3B4658`。工具列圖示 `windows/dpi-peek/assets/DPIPeek.ico` 也是同一組數字產生的。
 
 > 按下滑鼠的 DPI 鍵，螢幕上就顯示現在是哪一段、真實數值是多少。
 > 2.4G 模式下，亦可直接在選單列面板上點擊按鈕切換感測器 DPI。

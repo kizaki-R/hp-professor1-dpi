@@ -19,7 +19,9 @@ The Windows build is unsigned. SmartScreen shows only "Don't run" until you clic
 
 The Windows UI follows the Windows display language. Right-click the tray icon to switch among Traditional Chinese, Simplified Chinese, and English. Click-to-switch works on 2.4 GHz only. Bluetooth can show the overlay when you press the mouse DPI button; the firmware does not take write commands.
 
-Logo colors for the Mac app live in `assets/logo/seven/`: dark, light, menu-bar template, and the seven cyan stage marks. The Windows bars are an even-pitch redraw. They do not match the spacing in the original SVGs.
+The full brand pack lives in `assets/logo/velocity/`, with the Mac build taking its icns and MenuBar templates from there.
+
+The Windows bars are redrawn from the VELOCITY SVG coordinates rather than traced by eye: seven ascending bars, pitch 44, width 29, a constant 0.24 slant. Mac and Windows therefore render the same shape, with the same three-state palette — `#39D5FF` for the active stage, `#F3F7FF` for earlier ones, `#3B4658` for later ones. The tray icon in `windows/dpi-peek/assets/DPIPeek.ico` is generated from those same numbers.
 
 Pressing the physical DPI button shows an on-screen overlay with the active stage and exact hardware DPI. When connected through the 2.4 GHz USB receiver, you can also change DPI stages directly from the menu-bar popover.
 

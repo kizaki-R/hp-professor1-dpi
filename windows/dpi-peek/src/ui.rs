@@ -103,7 +103,7 @@ pub fn run() -> Result<(), String> {
         let hud = create_layered(instance, CLASS_HUD, true, true);
         let panel = create_layered(instance, CLASS_PANEL, false, false);
         let fonts = Fonts::load(scale);
-        let icon = icon_from_bgra(&crate::logo_icons::SEVEN_APP);
+        let icon = icon_from_bgra(&crate::logo_icons::APP_MARK);
         let stage_icons = [
             icon_from_bgra(crate::logo_icons::STAGES[0]),
             icon_from_bgra(crate::logo_icons::STAGES[1]),

@@ -19,7 +19,9 @@ Windows 这支没有签名。SmartScreen 会拦，画面上先只有“不运行
 
 界面跟着 Windows 显示语言。右键任务栏图标可以改成繁體中文、简体中文或 English。2.4G 可以在面板点数字切档；蓝牙只能按鼠标上的 DPI 键，软件下不去指令。
 
-图标配色在 `assets/logo/seven/`，留给 Mac。深色、浅色、菜单栏模板、七档青色都在那。Windows 现在画面上的七条斜线是等距、同斜率的重画版，跟素材包原 SVG 的间距不一样。
+完整的品牌素材在 `assets/logo/velocity/`，Mac 的 icns 与 MenuBar 模板都从那里取。
+
+Windows 端是按 VELOCITY 的 SVG 坐标重画的，不是描图：七条递增斜线、间距 44、线宽 29、斜率固定 0.24。所以 Mac 和 Windows 画出来是同一个形状，七段配色也一致——当前段 `#39D5FF`、之前的段 `#F3F7FF`、之后的段 `#3B4658`。托盘图标 `windows/dpi-peek/assets/DPIPeek.ico` 也由同一组数值生成。
 
 > 按下鼠标的 DPI 键，屏幕顶部即时显示当前档位与真实 DPI 数值。
 > 在 2.4G 模式下，亦可直接在菜单栏面板上点击按钮切换传感器 DPI。

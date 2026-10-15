@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
+const APP_ICON: &str = "DPIPeek.ico";
 
 pub fn prepare() {
     match ensure_installed() {
@@ -44,6 +45,9 @@ fn ensure_installed() -> Result<InstallAction, String> {
     }
     if !autostart_enabled() {
         set_autostart(true)?;
+    } else if let Some(lnk) = startup_shortcut() {
+        // Refresh so the shortcut icon follows renames of the icon file.
+        let _ = write_shortcut(&lnk);
     }
     let _ = write_start_menu_shortcut();
     Ok(InstallAction::Ready)
@@ -82,7 +86,7 @@ fn write_shortcut(lnk: &Path) -> Result<(), String> {
     let work = target.parent().unwrap_or(Path::new(".")).to_string_lossy().replace('\'', "''");
     let target_ps = target.to_string_lossy().replace('\'', "''");
     let lnk_ps = lnk.to_string_lossy().replace('\'', "''");
-    let icon = target.parent().unwrap_or(Path::new(".")).join("seven_app.ico");
+    let icon = target.parent().unwrap_or(Path::new(".")).join(APP_ICON);
     let icon_ps = icon.to_string_lossy().replace('\'', "''");
     let script = format!(
         "$s = New-Object -ComObject WScript.Shell; $sc = $s.CreateShortcut('{lnk_ps}'); $sc.TargetPath = '{target_ps}'; $sc.WorkingDirectory = '{work}'; $sc.IconLocation = '{icon_ps},0'; $sc.WindowStyle = 7; $sc.Description = 'HP Professor 1 DPI'; $sc.Save()"
@@ -133,8 +137,9 @@ fn same_path(a: &Path, b: &Path) -> bool {
 }
 
 fn write_app_icon(dir: &Path) -> Result<PathBuf, String> {
-    let path = dir.join("seven_app.ico");
-    std::fs::write(&path, include_bytes!("../assets/seven_app.ico")).map_err(|e| e.to_string())?;
+    let path = dir.join(APP_ICON);
+    std::fs::write(&path, include_bytes!("../assets/DPIPeek.ico")).map_err(|e| e.to_string())?;
+    let _ = std::fs::remove_file(dir.join("seven_app.ico"));
     Ok(path)
 }
 

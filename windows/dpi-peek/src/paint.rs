@@ -175,29 +175,49 @@ fn layout_chips(count: usize, panel_w: f32, scale: f32) -> Vec<Chip> {
     chips
 }
 
-/// Equal pitch, equal width, same slant. Heights still rise toward the middle.
-const BAR_HEIGHTS: [f32; 7] = [0.42, 0.58, 0.78, 1.0, 0.78, 0.58, 0.42];
+/// VELOCITY mark, straight out of the brand SVG's 512 viewBox.
+/// Seven ascending bars, pitch 44, width 29, skew = own height x 0.24.
+/// Values are normalized against the bar bounding box (346.8 x 279) so the
+/// mark can be dropped into any box with its aspect preserved.
+const MARK_ASPECT: f32 = 346.8 / 279.0;
+const BAR_X: [f32; 7] = [0.0, 0.126874, 0.253749, 0.380623, 0.507497, 0.634371, 0.761246];
+const BAR_TOP: [f32; 7] = [0.673835, 0.555556, 0.433692, 0.308244, 0.193548, 0.093190, 0.0];
+const BAR_BOT: [f32; 7] = [1.0, 0.971326, 0.939068, 0.903226, 0.870968, 0.831541, 0.802867];
+const BAR_SKEW: [f32; 7] = [0.062860, 0.080161, 0.097463, 0.114764, 0.130911, 0.142445, 0.155133];
+const BAR_W: f32 = 0.083622;
+
+const BAR_PAST: u32 = 0xFFF3_F7FF;
+const BAR_ACTIVE: u32 = 0xFF39_D5FF;
+const BAR_FUTURE: u32 = 0xFF3B_4658;
 
 fn draw_logo_bars(gfx: &Canvas, x: f32, y: f32, w: f32, h: f32, active: usize) {
-    let slant = 0.22;
-    let max_h = h * 0.96;
-    let inner = (w - max_h * slant).max(1.0);
-    let bar_w = inner * 0.072;
-    let gap = (inner - 7.0 * bar_w) / 6.0;
-    let mid_y = y + h / 2.0;
+    let mut mw = w.min(h * MARK_ASPECT);
+    let mut mh = mw / MARK_ASPECT;
+    if mh > h {
+        mh = h;
+        mw = mh * MARK_ASPECT;
+    }
+    let ox = x + (w - mw) / 2.0;
+    let oy = y + (h - mh) / 2.0;
     for i in 0..7 {
-        let bh = max_h * BAR_HEIGHTS[i];
-        let skew = bh * slant;
-        let top = mid_y - bh / 2.0;
-        let bot = mid_y + bh / 2.0;
-        let left = x + i as f32 * (bar_w + gap);
+        let left = ox + BAR_X[i] * mw;
+        let skew = BAR_SKEW[i] * mw;
+        let top = oy + BAR_TOP[i] * mh;
+        let bot = oy + BAR_BOT[i] * mh;
+        let right = left + BAR_W * mw;
         let pts = [
             left, bot,
-            left + bar_w, bot,
-            left + bar_w + skew, top,
+            right, bot,
+            right + skew, top,
             left + skew, top,
         ];
-        let color = if i == active { 0xFF62_D8FF } else { 0xFFF3_F7FF };
+        let color = if i == active {
+            BAR_ACTIVE
+        } else if i < active {
+            BAR_PAST
+        } else {
+            BAR_FUTURE
+        };
         gfx.fill_polygon(&pts, color);
     }
 }
