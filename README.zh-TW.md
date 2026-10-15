@@ -1,10 +1,25 @@
-# DPI Peek：HP Professor 1 專用的 macOS DPI 顯示器
+# DPI Peek：HP Professor 1 的 DPI 顯示
 
 [English](README.md) | **繁體中文** | [简体中文](README.zh-CN.md)
 
----
+Mac 是選單列工具。Windows 是常駐程式，開始功能表裡的名字是 **HP Professor 1 DPI**。
 
 **只支援 HP Professor 1**（ROYUAN 代工，`3151:4027` 2.4G 接收器、`3151:4028` 藍牙）。其他滑鼠請跑 `./royuan auto` 看偵測結果，細節見下方的「支援裝置」。
+
+## 下載
+
+到 [Releases](https://github.com/kizaki-R/hp-professor1-dpi/releases) 拿對應檔案。Windows 的檔名是 `HP-Professor-1-DPI-windows.exe`，不是 `DPIPeek.exe`。`DPIPeek` 只留在 Mac app，以及 Windows 裝好之後的資料夾 `%LOCALAPPDATA%\DPIPeek\`。
+
+| 系統 | 檔案 | 第一次打開 |
+|---|---|---|
+| Windows 10 / 11 | `HP-Professor-1-DPI-windows.exe` | 雙擊。程式會把自己複製到 `%LOCALAPPDATA%\DPIPeek\`，並加入這個使用者的開機啟動與開始功能表。不需要系統管理員。 |
+| macOS 11+ | `DPIPeek-*.zip` | 解壓後把 `DPIPeek.app` 放進「應用程式」。第一次請在圖示上按右鍵再打開。 |
+
+Windows 這支沒有簽章。SmartScreen 會擋，畫面上先只有「不要執行」。點「其他資訊」，才會出現「仍要執行」。同一台電腦按過一次就記住。
+
+介面跟著 Windows 顯示語言。右鍵工作列圖示可以改成繁體中文、简体中文或 English。2.4G 可以在面板點數字切段；藍牙只能按滑鼠上的 DPI 鍵，軟體下不去指令。
+
+圖示配色在 `assets/logo/seven/`，留給 Mac。深色、淺色、選單列模板、七檔青色都在那。Windows 現在畫面上的七條斜線是等距、同斜率的重畫版，跟素材包原 SVG 的間距不一樣。
 
 > 按下滑鼠的 DPI 鍵，螢幕上就顯示現在是哪一段、真實數值是多少。
 > 2.4G 模式下，亦可直接在選單列面板上點擊按鈕切換感測器 DPI。

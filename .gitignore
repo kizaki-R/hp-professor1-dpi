@@ -15,3 +15,7 @@ logs/
 # macOS noise
 .DS_Store
 ._*
+
+# Windows build output
+windows/dpi-peek/target/
+

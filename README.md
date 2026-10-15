@@ -1,10 +1,25 @@
-# DPI Peek: macOS DPI HUD & Controller for HP Professor 1
+# DPI Peek for the HP Professor 1
 
 **English** | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
 
----
+macOS gets a menu-bar app. Windows gets a tray app whose Start menu name is **HP Professor 1 DPI**.
 
-A lightweight macOS menu-bar utility and on-screen HUD for the **HP Professor 1** wireless mouse (ROYUAN OEM, `3151:4027` receiver / `3151:4028` Bluetooth).
+The mouse is the ROYUAN OEM unit: `3151:4027` on the 2.4 GHz receiver, `3151:4028` on Bluetooth.
+
+## Download
+
+Grab the file for your system from [Releases](https://github.com/kizaki-R/hp-professor1-dpi/releases). The Windows file is `HP-Professor-1-DPI-windows.exe`. Do not look for `DPIPeek.exe`. `DPIPeek` is the Mac app name, and also the folder Windows uses after install: `%LOCALAPPDATA%\DPIPeek\`.
+
+| System | File | First launch |
+|---|---|---|
+| Windows 10 / 11 | `HP-Professor-1-DPI-windows.exe` | Double-click. It copies itself to `%LOCALAPPDATA%\DPIPeek\`, then adds a startup shortcut and a Start menu entry for the current user. No admin prompt. |
+| macOS 11+ | `DPIPeek-*.zip` | Unzip, move `DPIPeek.app` to Applications, then right-click the icon and choose Open the first time. |
+
+The Windows build is unsigned. SmartScreen shows only "Don't run" until you click "More info", then "Run anyway". That choice sticks on that PC.
+
+The Windows UI follows the Windows display language. Right-click the tray icon to switch among Traditional Chinese, Simplified Chinese, and English. Click-to-switch works on 2.4 GHz only. Bluetooth can show the overlay when you press the mouse DPI button; the firmware does not take write commands.
+
+Logo colors for the Mac app live in `assets/logo/seven/`: dark, light, menu-bar template, and the seven cyan stage marks. The Windows bars are an even-pitch redraw. They do not match the spacing in the original SVGs.
 
 Pressing the physical DPI button shows an on-screen overlay with the active stage and exact hardware DPI. When connected through the 2.4 GHz USB receiver, you can also change DPI stages directly from the menu-bar popover.
 
