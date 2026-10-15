@@ -329,7 +329,7 @@ static NSString *timeString(NSDate *d) {
     NSImage *img = [NSImage imageNamed:iconName] ?: [[NSBundle mainBundle] imageForResource:iconName];
     if (img) {
         img.template = YES; // Adapts smoothly to macOS dark/light menu bar
-        img.size = NSMakeSize(20, 16);
+        img.size = NSMakeSize(22.5, 18.0);
         btn.image = img;
     }
 
