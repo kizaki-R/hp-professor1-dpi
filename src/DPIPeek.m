@@ -158,10 +158,8 @@ static NSString *timeString(NSDate *d) {
 @property (nonatomic, strong) NSImageView *logoView;
 @property (nonatomic, strong) NSTextField *titleLabel;
 @property (nonatomic, strong) NSTextField *badgeLabel;
-@property (nonatomic, strong) NSButton *pinCheck;
 @property (nonatomic, strong) NSButton *quitBtn;
 @property (nonatomic, strong) NSBox *headerSeparator;
-@property (nonatomic) BOOL pinned;
 @property (nonatomic) NSTimeInterval lastCloseTime;
 @property (nonatomic) NSInteger currentTheme; // 0=Auto, 1=Light, 2=Dark
 
@@ -199,7 +197,6 @@ static NSString *timeString(NSDate *d) {
 
     self.watcher = [HIDWatcher new];
     self.mapper = [DPIMapper loadFromDefaults];
-    self.pinned = [NSUserDefaults.standardUserDefaults boolForKey:@"DPIPeek.pinned"];
     self.currentTheme = [NSUserDefaults.standardUserDefaults integerForKey:@"DPIPeek.theme"]; // 0=Auto, 1=Light, 2=Dark
 
     __weak AppDelegate *weakSelf = self;
@@ -428,18 +425,11 @@ static NSString *timeString(NSDate *d) {
 }
 
 - (void)closePanelFromKey {
-    if (self.pinned) return;
     [self closePanel];
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification {
-    if (self.pinned) return;
     [self closePanel];
-}
-
-- (void)togglePin:(id)sender {
-    self.pinned = (self.pinCheck.state == NSControlStateValueOn);
-    [NSUserDefaults.standardUserDefaults setBool:self.pinned forKey:@"DPIPeek.pinned"];
 }
 
 - (void)buildMainMenu {
@@ -496,9 +486,9 @@ static NSString *timeString(NSDate *d) {
     self.container.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     self.window.contentView = self.container;
 
-    // Native frosted glass background view: adapts to Light & Dark modes automatically
+    // Native frosted glass background view: adapts to Light & Dark modes automatically with translucency
     self.effectView = [[NSVisualEffectView alloc] initWithFrame:self.container.bounds];
-    self.effectView.material = NSVisualEffectMaterialPopover;
+    self.effectView.material = NSVisualEffectMaterialUnderWindowBackground;
     self.effectView.blendingMode = NSVisualEffectBlendingModeBehindWindow;
     self.effectView.state = NSVisualEffectStateActive;
     self.effectView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
@@ -506,7 +496,7 @@ static NSString *timeString(NSDate *d) {
 
     NSView *cv = self.container;
 
-    // Header Bar: VELOCITY Logo + Title + Mode Badge + Pin + Quit
+    // Header Bar: VELOCITY Logo + Title + Mode Badge + Quit
     NSImage *logo = [NSImage imageNamed:@"logo_mark"];
     if (!logo) logo = [[NSBundle mainBundle] imageForResource:@"logo_mark"];
     self.logoView = [[NSImageView alloc] initWithFrame:NSMakeRect(14, 0, 20, 20)];
@@ -517,15 +507,9 @@ static NSString *timeString(NSDate *d) {
     self.titleLabel = [self label:@"HP Professor 1 DPI" x:38 w:136 y:0 size:12 bold:YES];
     [cv addSubview:self.titleLabel];
 
-    self.badgeLabel = [self label:@"2.4G 4000 DPI" x:178 w:110 y:0 size:9.5 bold:NO];
+    self.badgeLabel = [self label:@"2.4G 4000 DPI" x:178 w:126 y:0 size:9.5 bold:NO];
     self.badgeLabel.textColor = [NSColor secondaryLabelColor];
     [cv addSubview:self.badgeLabel];
-
-    self.pinCheck = [NSButton checkboxWithTitle:@"📌 釘選" target:self action:@selector(togglePin:)];
-    self.pinCheck.toolTip = @"釘選後點擊外部不會自動關閉面板";
-    self.pinCheck.font = [NSFont systemFontOfSize:11];
-    self.pinCheck.state = self.pinned ? NSControlStateValueOn : NSControlStateValueOff;
-    [cv addSubview:self.pinCheck];
 
     self.quitBtn = [self button:@"結束" action:@selector(terminate:) x:0 w:52 y:0];
     self.quitBtn.font = [NSFont systemFontOfSize:11];
@@ -644,9 +628,8 @@ static NSString *timeString(NSDate *d) {
     y -= 22.0;
     self.logoView.frame = NSMakeRect(14.0, y, 20.0, 20.0);
     self.titleLabel.frame = NSMakeRect(38.0, y + 2.0, 136.0, 18.0);
-    self.badgeLabel.frame = NSMakeRect(178.0, y + 2.0, 110.0, 16.0);
-    self.pinCheck.frame = NSMakeRect(268.0, y + 1.0, 52.0, 20.0);
-    self.quitBtn.frame = NSMakeRect(322.0, y - 1.0, 44.0, 24.0);
+    self.badgeLabel.frame = NSMakeRect(178.0, y + 2.0, 136.0, 16.0);
+    self.quitBtn.frame = NSMakeRect(318.0, y - 1.0, 48.0, 24.0);
 
     y -= 6.0;
     self.headerSeparator.frame = NSMakeRect(14.0, y, 352.0, 1.0);
@@ -689,8 +672,6 @@ static NSString *timeString(NSDate *d) {
 
 - (void)updateLocalizedUI {
     Localization *loc = Localization.shared;
-    self.pinCheck.title = [loc pin];
-    self.pinCheck.toolTip = [loc pinTooltip];
     self.quitBtn.title = [loc quit];
     self.themeLabel.stringValue = [loc themeTitle];
     [self.themeSegments setLabel:[loc themeAuto] forSegment:0];
