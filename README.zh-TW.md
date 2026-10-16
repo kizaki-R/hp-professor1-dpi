@@ -21,7 +21,7 @@ Windows 這支沒有簽章。SmartScreen 會擋，畫面上先只有「不要執
 
 完整的品牌素材在 `assets/logo/velocity/`，Mac 的 icns 與 MenuBar 模板都從那裡拿。
 
-Windows 端是照 VELOCITY 的 SVG 座標重畫的，不是描圖：七條遞增斜線、間距 44、線寬 29、斜率固定 0.24。所以 Mac 和 Windows 畫出來是同一個形狀，連七段配色也一樣——當前段 `#39D5FF`、之前的段 `#F3F7FF`、之後的段 `#3B4658`。工具列圖示 `windows/dpi-peek/assets/DPIPeek.ico` 也是同一組數字產生的。
+Windows 端是照 VELOCITY 的 SVG 座標重畫的，不是描圖：七條遞增斜線、間距 44、線寬 29、斜率固定 0.24。所以 Mac 和 Windows 畫出來是同一個形狀，連七段配色也一樣──當前段 `#39D5FF`、之前的段 `#F3F7FF`、之後的段 `#3B4658`。工具列圖示 `windows/dpi-peek/assets/DPIPeek.ico` 也是同一組數字產生的。
 
 > 按下滑鼠的 DPI 鍵，螢幕上就顯示現在是哪一段、真實數值是多少。
 > 2.4G 模式下，亦可直接在選單列面板上點擊按鈕切換感測器 DPI。
@@ -54,16 +54,28 @@ DPI 是光學感測器的物理採樣解析度。作業系統底層通常只接�
 
 - **懸浮 HUD 提示**：按下 DPI 鍵，螢幕上方出現半透明 HUD（如 `3200 DPI　第 6 / 7 段`），1.5 秒後淡出，不搶視窗焦點、不影響全螢幕遊戲與工作。
 - **選單列彈出面板**：
-  - 依附於選單列 `DPI` 圖示正下方。點擊外部自動收起，支援 `Esc` 關閉與「📌 釘選」固定開啟。
+  - 依附於選單列 `DPI` 圖示正下方。點擊外部自動收起，支援 `Esc` 關閉。
   - **點擊直切（2.4G 模式）**：在面板上直接點擊段數按鈕（`800` 至 `4000`），滑鼠硬體光學感測器即時切換至對應解析度。
   - **雙模式動態切換**：拔插 2.4G 接收器或撥動滑鼠底部開關時，面板自動切換 `2.4G` 與 `藍牙` 狀態。
 - **主題外觀切換**：
   - 支援 `💻 自動`（跟隨系統）、`☀️ 淺色`、`🌙 深色` 三段切換，原生磨砂玻璃質感，對比清晰無死黑與白邊。
+- **電池電量顯示**：
+  - 面板與選單列圖示右側顯示滑鼠剩餘電量，20% 以下換成 🪫。2.4G 走原廠通道讀取，藍牙走 BLE GATT（`0x180F`）。
+- **介面語系**：
+  - 面板內可切換繁體中文、简体中文、English，選擇會記住。
 - **防休眠最佳化**：
   - 設定 `NSAppSleepDisabled` 與 Process Activity Assertion，避免 macOS App Nap 機制凍結背景輪詢。
 - **附帶開發與診斷 CLI**：
   - `probe`：HID 封包監看、描述元解析與移動距離實測工具。
   - `royuan`：ROYUAN 家族原廠協定測試工具，含通用自動偵測（`./royuan auto`）。
+
+Windows 版在 `windows/dpi-peek/`，同一套功能走系統匣：
+
+- **工作列圖示**：七條 VELOCITY 斜線，顏色跟著當前段數跑。
+- **面板從工作列彈出**：左鍵點圖示開段數清單，點數字直接切換（2.4G）。右鍵選單可切語系、開機啟動、結束程式。
+- **連線狀態與電量**：面板顯示 `2.4G`、`藍牙` 或 `未連線` 與電量百分比。電量只走 2.4G 中繼，藍牙讀不到。
+- **螢幕上方居中提示**：按滑鼠 DPI 鍵時顯示段數與真實數值。藍牙模式下這是唯一的即時來源，因為韌體不接受主機寫入。
+- **三種語系**：跟著 Windows 顯示語言，也可從右鍵選單改。
 
 ---
 
@@ -94,6 +106,16 @@ cd hp-professor1-dpi
 ```
 
 安裝完成後，至 **系統設定 → 隱私權與安全性 → 輸入監控**，開啟 **HP Professor 1 DPI**。macOS 規定讀取 HID 資料必須由使用者授權；授權後 App 會自動開始監看。
+
+Windows 版要自己編譯的話，裝好 Rust 工具鏈後在原始碼裡編：
+
+```sh
+cd windows/dpi-peek
+cargo build --release
+python stamp_resources.py target/release/dpi-peek.exe HP-Professor-1-DPI-windows.exe
+```
+
+第二步用 Windows SDK 的 `rc.exe` 接上圖示與版本資訊。找不到 `rc.exe` 時會原樣複製，所以單獨跑 `cargo build` 也能用。細節見 [windows/dpi-peek/README.md](windows/dpi-peek/README.md)。
 
 ### B. 下載 Release 打包檔
 
@@ -129,6 +151,7 @@ src/royuan.m            ROYUAN 協定 CLI：通用裝置探索、暫存器讀寫
 build.sh                編譯、組裝 Bundle 與代碼簽章
 make-identity.sh        產生本機持久簽章身分（保留 TCC 輸入監控授權）
 make-release.sh         打包發布用 Zip 與原始碼歸檔
+windows/dpi-peek/       Windows 系統匣程式：Rust + Win32，不用 GUI 框架
 ```
 
 驗證指令：

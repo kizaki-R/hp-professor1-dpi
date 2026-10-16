@@ -54,16 +54,28 @@ Protocol internals (checksum byte formula, receiver relay sequence, opcode table
 
 - **Translucent HUD Overlay**: Displays current status (e.g. `3200 DPI  Stage 6 / 7`) on button press, fading out after 1.5 seconds without taking keyboard focus.
 - **Menu-bar Attached Popover**:
-  - Anchored directly under the `DPI` icon. Dismisses when clicking outside, supports `Esc` to close, and includes a `📌 Pin` toggle to stay visible during testing.
+  - Anchored directly under the `DPI` icon. Dismisses when clicking outside; `Esc` closes it.
   - **Click-to-Switch (2.4 GHz)**: Click any stage pill (`800` through `4000`) in the panel to update sensor resolution immediately via vendor opcode `0x54`.
   - **Dynamic Connection Tracking**: Handles USB dongle hotplugging and bottom switch toggles, automatically switching between `2.4G` and `Bluetooth` modes.
 - **Theme Selection**:
   - `💻 Auto` (inherits macOS appearance), `☀️ Light`, and `🌙 Dark`. Built with frosted glass (`NSVisualEffectMaterialPopover`) and system typography to avoid washed-out text.
+- **Battery Read-out**:
+  - The panel and the menu-bar icon show the mouse's remaining charge, swapping to 🪫 below 20%. The 2.4 GHz channel reads it from the vendor protocol; Bluetooth reads it over BLE GATT (`0x180F`).
+- **Interface Language**:
+  - Traditional Chinese, Simplified Chinese, and English, switchable inside the panel and remembered across launches.
 - **App Nap Prevention**:
   - Bundles `NSAppSleepDisabled` and `NSProcessInfo` activity assertions so background polling is not throttled when the popover is closed.
 - **Diagnostic CLI Tools**:
   - `probe`: Raw HID packet monitoring, report descriptor dumping, and physical sensor distance calibration.
   - `royuan`: Protocol inspector with auto-detection for compatible mice (`./royuan auto`).
+
+The Windows build lives in `windows/dpi-peek/` and does the same job from the system tray:
+
+- **Tray Icon**: Seven VELOCITY bars, recoloured to the current stage.
+- **Panel from the Taskbar**: Left-click the tray icon for the stage list. Chips switch DPI directly over 2.4 GHz. Right-click for language, launch-at-login, and Quit.
+- **Link Status and Battery**: The panel reads `2.4G`, `Bluetooth`, `2.4G asleep`, or `Offline` and shows a percentage. Battery comes over the 2.4 GHz relay only; Bluetooth does not expose it.
+- **Overlay at the Top Centre**: Pressing the mouse's DPI button shows the stage and exact DPI. On Bluetooth this is the only live signal, since the firmware ignores host writes.
+- **Three Languages**: Follows the Windows display language; the tray menu overrides it.
 
 ---
 
@@ -95,6 +107,16 @@ cd hp-professor1-dpi
 
 After installing, go to **System Settings → Privacy & Security → Input Monitoring** and enable **HP Professor 1 DPI**. macOS requires explicit user approval before an app can read raw HID streams.
 
+For the Windows app, install a Rust toolchain and build it in place:
+
+```sh
+cd windows/dpi-peek
+cargo build --release
+python stamp_resources.py target/release/dpi-peek.exe HP-Professor-1-DPI-windows.exe
+```
+
+The stamp step attaches the icon and version info through the Windows SDK's `rc.exe`. Without that tool it copies the binary through unchanged, so `cargo build` alone stays usable. More in [windows/dpi-peek/README.md](windows/dpi-peek/README.md).
+
 ### Option B: Download Release Binary
 
 1. Grab `HP-Professor-1-DPI-macOS.dmg` (or the `.zip`) from [Releases](https://github.com/kizaki-R/hp-professor1-dpi/releases).
@@ -112,7 +134,7 @@ After installing, go to **System Settings → Privacy & Security → Input Monit
    - Right-click the icon for quick actions (Test HUD, Appearance theme, Privacy settings, Quit).
 3. **Switching DPI via Software**:
    - In 2.4 GHz mode, click any stage pill (`800`–`4000`) to change sensor speed on the mouse.
-   - In Bluetooth mode, stage pills act as live status indicators because the mouse BLE stack does not accept host write commands.
+   - In Bluetooth mode, clicking a stage pill pops a notice telling you to use the mouse's physical DPI button; the firmware does not accept host writes.
 4. **Launch at Login**: To keep it running in the background, add **HP Professor 1 DPI** under **System Settings → General → Login Items**.
 
 ---
@@ -129,6 +151,7 @@ src/royuan.m            CLI tool: generic device discovery, vendor register oper
 build.sh                Compile, assemble .app bundle, and sign
 make-identity.sh        Generate persistent local self-signed certificate
 make-release.sh         Package release archives
+windows/dpi-peek/       Windows tray app: Rust + Win32, no GUI framework
 ```
 
 Verification commands:
