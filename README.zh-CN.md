@@ -15,6 +15,8 @@ Mac 是菜单栏工具。Windows 是常驻程序，开始菜单里的名字是 *
 | Windows 10 / 11 | `HP-Professor-1-DPI-windows.exe` | 双击。程序会把自己复制到 `%LOCALAPPDATA%\HP Professor 1 DPI\`，并加入当前用户的开机启动和开始菜单。不需要管理员。 |
 | macOS 11+ | `HP-Professor-1-DPI-macOS.dmg`（或 `.zip`） | 打开 dmg，把 **HP Professor 1 DPI** 拖进“应用程序”。第一次请在图标上右键再打开。 |
 
+macOS 这边改名时也换了 bundle ID。macOS 把“输入监控”的授权绑在 bundle ID 上，所以装过旧版的话，换成新版之后要重新把“输入监控”授权给 **HP Professor 1 DPI**，旧的授权不会自己跟过来。
+
 Windows 这支没有签名。SmartScreen 会拦，画面上先只有“不运行”。点“更多信息”，才会出现“仍要运行”。同一台电脑按过一次就会记住。
 
 界面跟着 Windows 显示语言。右键任务栏图标可以改成繁體中文、简体中文或 English。2.4G 可以在面板点数字切档；蓝牙只能按鼠标上的 DPI 键，软件下不去指令。

@@ -15,6 +15,8 @@ Grab the file for your system from [Releases](https://github.com/kizaki-R/hp-pro
 | Windows 10 / 11 | `HP-Professor-1-DPI-windows.exe` | Double-click. It copies itself to `%LOCALAPPDATA%\HP Professor 1 DPI\`, then adds a startup shortcut and a Start menu entry for the current user. No admin prompt. |
 | macOS 11+ | `HP-Professor-1-DPI-macOS.dmg` (or the `.zip`) | Open the dmg and drag **HP Professor 1 DPI** into Applications, then right-click the app and choose Open the first time. |
 
+On macOS the rename also changed the bundle identifier. macOS ties the Input Monitoring permission to that identifier, so if you had an earlier build installed, replace it and then grant Input Monitoring to **HP Professor 1 DPI** again — the old grant does not carry over.
+
 The Windows build is unsigned. SmartScreen shows only "Don't run" until you click "More info", then "Run anyway". That choice sticks on that PC.
 
 The Windows UI follows the Windows display language. Right-click the tray icon to switch among Traditional Chinese, Simplified Chinese, and English. Click-to-switch works on 2.4 GHz only. Bluetooth can show the overlay when you press the mouse DPI button; the firmware does not take write commands.
