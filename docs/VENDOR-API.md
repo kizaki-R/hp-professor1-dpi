@@ -160,7 +160,7 @@ levels=7  active index=0  ->  800 DPI    ...
 ## 7. App 如何使用
 
 - **2.4G / 有線模式**：`VendorChannel` 每 0.6 秒做一次上述握手 + `0xD4`，
-  段數一變就跳 HUD，並把讀到的表寫進 DPI 段數欄位（`DPIPeek.presets.v2`）。
+  段數一變就跳 HUD，並把讀到的表寫進 DPI 段數欄位（`HPProfessor1DPI.presets.v2`）。
 - **藍牙模式**：沿用 `66 0C NN` 通知取得段數，再對照同一張表顯示真實 DPI。
 - 兩條通道可以同時開著：滑鼠同時只會連一種模式，所以不會重複觸發。
 

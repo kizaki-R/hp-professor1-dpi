@@ -1,4 +1,4 @@
-# DPI Peek for the HP Professor 1
+# HP Professor 1 DPI
 
 **English** | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
 
@@ -8,11 +8,11 @@ The mouse is the ROYUAN OEM unit: `3151:4027` on the 2.4 GHz receiver, `3151:402
 
 ## Download
 
-Grab the file for your system from [Releases](https://github.com/kizaki-R/hp-professor1-dpi/releases). The Windows file is `HP-Professor-1-DPI-windows.exe`. Do not look for `DPIPeek.exe`. The name survives only in the Windows install folder `%LOCALAPPDATA%\DPIPeek\` and in some source file names.
+Grab the file for your system from [Releases](https://github.com/kizaki-R/hp-professor1-dpi/releases). The Windows file is `HP-Professor-1-DPI-windows.exe`. If you installed a Windows build from before the rename, it left a copy under `%LOCALAPPDATA%\DPIPeek\`; the current build moves your settings across and deletes the old folder on first launch.
 
 | System | File | First launch |
 |---|---|---|
-| Windows 10 / 11 | `HP-Professor-1-DPI-windows.exe` | Double-click. It copies itself to `%LOCALAPPDATA%\DPIPeek\`, then adds a startup shortcut and a Start menu entry for the current user. No admin prompt. |
+| Windows 10 / 11 | `HP-Professor-1-DPI-windows.exe` | Double-click. It copies itself to `%LOCALAPPDATA%\HP Professor 1 DPI\`, then adds a startup shortcut and a Start menu entry for the current user. No admin prompt. |
 | macOS 11+ | `HP-Professor-1-DPI-macOS.dmg` (or the `.zip`) | Open the dmg and drag **HP Professor 1 DPI** into Applications, then right-click the app and choose Open the first time. |
 
 The Windows build is unsigned. SmartScreen shows only "Don't run" until you click "More info", then "Run anyway". That choice sticks on that PC.
@@ -21,7 +21,7 @@ The Windows UI follows the Windows display language. Right-click the tray icon t
 
 The full brand pack lives in `assets/logo/velocity/`, with the Mac build taking its icns and MenuBar templates from there.
 
-The Windows bars are redrawn from the VELOCITY SVG coordinates rather than traced by eye: seven ascending bars, pitch 44, width 29, a constant 0.24 slant. Mac and Windows therefore render the same shape, with the same three-state palette — `#39D5FF` for the active stage, `#F3F7FF` for earlier ones, `#3B4658` for later ones. The tray icon in `windows/dpi-peek/assets/DPIPeek.ico` is generated from those same numbers.
+The Windows bars are redrawn from the VELOCITY SVG coordinates rather than traced by eye: seven ascending bars, pitch 44, width 29, a constant 0.24 slant. Mac and Windows therefore render the same shape, with the same three-state palette — `#39D5FF` for the active stage, `#F3F7FF` for earlier ones, `#3B4658` for later ones. The tray icon in `windows/hp-professor-1-dpi/assets/AppIcon.ico` is generated from those same numbers.
 
 Pressing the physical DPI button shows an on-screen overlay with the active stage and exact hardware DPI. When connected through the 2.4 GHz USB receiver, you can also change DPI stages directly from the menu-bar popover.
 
@@ -69,7 +69,7 @@ Protocol internals (checksum byte formula, receiver relay sequence, opcode table
   - `probe`: Raw HID packet monitoring, report descriptor dumping, and physical sensor distance calibration.
   - `royuan`: Protocol inspector with auto-detection for compatible mice (`./royuan auto`).
 
-The Windows build lives in `windows/dpi-peek/` and does the same job from the system tray:
+The Windows build lives in `windows/hp-professor-1-dpi/` and does the same job from the system tray:
 
 - **Tray Icon**: Seven VELOCITY bars, recoloured to the current stage.
 - **Panel from the Taskbar**: Left-click the tray icon for the stage list. Chips switch DPI directly over 2.4 GHz. Right-click for language, launch-at-login, and Quit.
@@ -110,12 +110,12 @@ After installing, go to **System Settings → Privacy & Security → Input Monit
 For the Windows app, install a Rust toolchain and build it in place:
 
 ```sh
-cd windows/dpi-peek
+cd windows/hp-professor-1-dpi
 cargo build --release
-python stamp_resources.py target/release/dpi-peek.exe HP-Professor-1-DPI-windows.exe
+python stamp_resources.py target/release/hp-professor-1-dpi.exe HP-Professor-1-DPI-windows.exe
 ```
 
-The stamp step attaches the icon and version info through the Windows SDK's `rc.exe`. Without that tool it copies the binary through unchanged, so `cargo build` alone stays usable. More in [windows/dpi-peek/README.md](windows/dpi-peek/README.md).
+The stamp step attaches the icon and version info through the Windows SDK's `rc.exe`. Without that tool it copies the binary through unchanged, so `cargo build` alone stays usable. More in [windows/hp-professor-1-dpi/README.md](windows/hp-professor-1-dpi/README.md).
 
 ### Option B: Download Release Binary
 
@@ -142,16 +142,16 @@ The stamp step attaches the icon and version info through the Windows SDK's `rc.
 ## Repository Layout
 
 ```text
-src/HIDWatcher.{h,m}    IOKit HID monitoring, hotplug callbacks, BLE input stream
-src/DPIMapper.{h,m}     Stage-to-DPI mappings, persistence, HUD string formatting
-src/VendorChannel.{h,m} 2.4 GHz feature channel: relay handshake, 0xD4 read, 0x54 write, link tracking
-src/DPIPeek.m           Menu-bar popover, HUD panel, theme rendering, selftest runner
-src/probe.m             CLI diagnostic: descriptor dumper, packet streamer, distance calibration
-src/royuan.m            CLI tool: generic device discovery, vendor register operations
-build.sh                Compile, assemble .app bundle, and sign
-make-identity.sh        Generate persistent local self-signed certificate
-make-release.sh         Package release archives
-windows/dpi-peek/       Windows tray app: Rust + Win32, no GUI framework
+src/HIDWatcher.{h,m}        IOKit HID monitoring, hotplug callbacks, BLE input stream
+src/DPIMapper.{h,m}         Stage-to-DPI mappings, persistence, HUD string formatting
+src/VendorChannel.{h,m}     2.4 GHz feature channel: relay handshake, 0xD4 read, 0x54 write, link tracking
+src/HPProfessor1DPI.m       Menu-bar popover, HUD panel, theme rendering, selftest runner
+src/probe.m                 CLI diagnostic: descriptor dumper, packet streamer, distance calibration
+src/royuan.m                CLI tool: generic device discovery, vendor register operations
+build.sh                    Compile, assemble .app bundle, and sign
+make-identity.sh            Generate persistent local self-signed certificate
+make-release.sh             Package release archives
+windows/hp-professor-1-dpi/ Windows tray app: Rust + Win32, no GUI framework
 ```
 
 Verification commands:

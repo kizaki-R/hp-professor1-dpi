@@ -1,0 +1,23 @@
+[package]
+name = "hp-professor-1-dpi"
+version = "0.1.0"
+edition = "2021"
+description = "HP Professor 1 DPI display for Windows"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "hp-professor-1-dpi"
+path = "src/bin/hp-professor-1-dpi.rs"
+
+[[bin]]
+name = "hp-professor-1-dpi-status"
+path = "src/bin/hp-professor-1-dpi-status.rs"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = "z"
+panic = "abort"

@@ -2,7 +2,8 @@
 #import "DPIMapper.h"
 #import "Localization.h"
 
-static NSString *const kPresetsKey = @"DPIPeek.presets.v2";
+static NSString *const kPresetsKey = @"HPProfessor1DPI.presets.v2";
+static NSString *const kLegacyPresetsKey = @"DPIPeek.presets.v2";   // pre-1.1 name; read as a fallback
 static const NSInteger kStepCount = 7;
 
 @implementation DPIMapper
@@ -20,6 +21,12 @@ static const NSInteger kStepCount = 7;
 + (instancetype)loadFromDefaults {
     DPIMapper *m = [DPIMapper new];
     NSArray *saved = [NSUserDefaults.standardUserDefaults arrayForKey:kPresetsKey];
+    if (saved.count == 0) {
+        // Settings written by a pre-1.1 build. Only the two keys are renamed, so
+        // reading through to the old one is cheaper than making people re-enter
+        // their measured table.
+        saved = [NSUserDefaults.standardUserDefaults arrayForKey:kLegacyPresetsKey];
+    }
     if (saved.count == 0) {
         // factory table read from the mouse itself with vendor opcode 0xD4
         NSArray *factory = @[@800, @1000, @1200, @1600, @2400, @3200, @4000];

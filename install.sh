@@ -1,5 +1,5 @@
 #!/bin/bash
-# Installs (or updates) DPI Peek in /Applications so it is easy to find in
+# Installs (or updates) HP Professor 1 DPI in /Applications so it is easy to find in
 # 系統設定 → 隱私權與安全性 → 輸入監控, and available to Login Items.
 #
 # Run this after ./build.sh whenever you want the installed copy refreshed.
@@ -36,4 +36,4 @@ cp -R "$SRC" "$DEST/"
 echo "==> launched"
 open "$DEST/HP Professor 1 DPI.app"
 sleep 2
-echo "==> installed. logs: /Applications/logs/  (or ~/Library/Logs/DPIPeek/ if not writable)"
+echo "==> installed. logs: /Applications/logs/  (or ~/Library/Logs/HP Professor 1 DPI/ if not writable)"

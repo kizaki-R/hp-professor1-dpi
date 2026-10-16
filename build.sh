@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds DPI Peek.app and the diagnostic CLI (probe).
+# Builds HP Professor 1 DPI.app and the diagnostic CLI (probe).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -10,7 +10,7 @@ mkdir -p build "$CACHE"
 echo "==> compiling HPProfessor1DPI binary"
 clang -fobjc-arc -fmodules-cache-path="$CACHE" -O2 -Wall \
     -o build/HPProfessor1DPI \
-    src/DPIPeek.m src/HIDWatcher.m src/DPIMapper.m src/VendorChannel.m src/BLEBatteryReader.m src/Localization.m \
+    src/HPProfessor1DPI.m src/HIDWatcher.m src/DPIMapper.m src/VendorChannel.m src/BLEBatteryReader.m src/Localization.m \
     -framework Cocoa -framework IOKit -framework CoreBluetooth
 
 echo "==> compiling probe CLI"
@@ -39,7 +39,7 @@ if [ -f "$KC" ]; then
     echo "==> signing with stable identity (KizakiWorks Local)"
     security unlock-keychain -p "dpipeek" "$KC" 2>/dev/null || true
     if codesign --force --keychain "$KC" --sign "KizakiWorks Local" \
-            --identifier com.kizakiworks.dpipeek "$APP" 2>/dev/null; then
+            --identifier com.kizakiworks.hp-professor-1-dpi "$APP" 2>/dev/null; then
         SIGNED=1
     else
         echo "   (stable identity failed, falling back to ad-hoc)"
@@ -48,7 +48,7 @@ fi
 
 if [ "$SIGNED" != "1" ]; then
     echo "==> ad-hoc signing"
-    codesign --force --sign - --identifier com.kizakiworks.dpipeek "$APP" >/dev/null 2>&1 || \
+    codesign --force --sign - --identifier com.kizakiworks.hp-professor-1-dpi "$APP" >/dev/null 2>&1 || \
         echo "   (codesign failed — app still runs locally)"
 fi
 

@@ -1,4 +1,4 @@
-# DPI Peek：HP Professor 1 的 DPI 顯示
+# HP Professor 1 DPI
 
 [English](README.md) | **繁體中文** | [简体中文](README.zh-CN.md)
 
@@ -8,11 +8,11 @@ Mac 是選單列工具。Windows 是常駐程式，開始功能表裡的名字�
 
 ## 下載
 
-到 [Releases](https://github.com/kizaki-R/hp-professor1-dpi/releases) 拿對應檔案。Windows 的檔名是 `HP-Professor-1-DPI-windows.exe`，不是 `DPIPeek.exe`。`DPIPeek` 現在只留在 Windows 的安裝資料夾 `%LOCALAPPDATA%\DPIPeek\` 和部分原始碼檔名裡。
+到 [Releases](https://github.com/kizaki-R/hp-professor1-dpi/releases) 拿對應檔案。Windows 的檔名是 `HP-Professor-1-DPI-windows.exe`。改名前裝過 Windows 版的話，舊的 `%LOCALAPPDATA%\DPIPeek\` 還在；現在的版本第一次啟動會把設定搬過去，並刪掉舊資料夾。
 
 | 系統 | 檔案 | 第一次打開 |
 |---|---|---|
-| Windows 10 / 11 | `HP-Professor-1-DPI-windows.exe` | 雙擊。程式會把自己複製到 `%LOCALAPPDATA%\DPIPeek\`，並加入這個使用者的開機啟動與開始功能表。不需要系統管理員。 |
+| Windows 10 / 11 | `HP-Professor-1-DPI-windows.exe` | 雙擊。程式會把自己複製到 `%LOCALAPPDATA%\HP Professor 1 DPI\`，並加入這個使用者的開機啟動與開始功能表。不需要系統管理員。 |
 | macOS 11+ | `HP-Professor-1-DPI-macOS.dmg`（或 `.zip`） | 開啟 dmg，把 **HP Professor 1 DPI** 拖進「應用程式」。第一次請在圖示上按右鍵再打開。 |
 
 Windows 這支沒有簽章。SmartScreen 會擋，畫面上先只有「不要執行」。點「其他資訊」，才會出現「仍要執行」。同一台電腦按過一次就記住。
@@ -21,7 +21,7 @@ Windows 這支沒有簽章。SmartScreen 會擋，畫面上先只有「不要執
 
 完整的品牌素材在 `assets/logo/velocity/`，Mac 的 icns 與 MenuBar 模板都從那裡拿。
 
-Windows 端是照 VELOCITY 的 SVG 座標重畫的，不是描圖：七條遞增斜線、間距 44、線寬 29、斜率固定 0.24。所以 Mac 和 Windows 畫出來是同一個形狀，連七段配色也一樣──當前段 `#39D5FF`、之前的段 `#F3F7FF`、之後的段 `#3B4658`。工具列圖示 `windows/dpi-peek/assets/DPIPeek.ico` 也是同一組數字產生的。
+Windows 端是照 VELOCITY 的 SVG 座標重畫的，不是描圖：七條遞增斜線、間距 44、線寬 29、斜率固定 0.24。所以 Mac 和 Windows 畫出來是同一個形狀，連七段配色也一樣──當前段 `#39D5FF`、之前的段 `#F3F7FF`、之後的段 `#3B4658`。工具列圖示 `windows/hp-professor-1-dpi/assets/AppIcon.ico` 也是同一組數字產生的。
 
 > 按下滑鼠的 DPI 鍵，螢幕上就顯示現在是哪一段、真實數值是多少。
 > 2.4G 模式下，亦可直接在選單列面板上點擊按鈕切換感測器 DPI。
@@ -69,7 +69,7 @@ DPI 是光學感測器的物理採樣解析度。作業系統底層通常只接�
   - `probe`：HID 封包監看、描述元解析與移動距離實測工具。
   - `royuan`：ROYUAN 家族原廠協定測試工具，含通用自動偵測（`./royuan auto`）。
 
-Windows 版在 `windows/dpi-peek/`，同一套功能走系統匣：
+Windows 版在 `windows/hp-professor-1-dpi/`，同一套功能走系統匣：
 
 - **工作列圖示**：七條 VELOCITY 斜線，顏色跟著當前段數跑。
 - **面板從工作列彈出**：左鍵點圖示開段數清單，點數字直接切換（2.4G）。右鍵選單可切語系、開機啟動、結束程式。
@@ -110,12 +110,12 @@ cd hp-professor1-dpi
 Windows 版要自己編譯的話，裝好 Rust 工具鏈後在原始碼裡編：
 
 ```sh
-cd windows/dpi-peek
+cd windows/hp-professor-1-dpi
 cargo build --release
-python stamp_resources.py target/release/dpi-peek.exe HP-Professor-1-DPI-windows.exe
+python stamp_resources.py target/release/hp-professor-1-dpi.exe HP-Professor-1-DPI-windows.exe
 ```
 
-第二步用 Windows SDK 的 `rc.exe` 接上圖示與版本資訊。找不到 `rc.exe` 時會原樣複製，所以單獨跑 `cargo build` 也能用。細節見 [windows/dpi-peek/README.md](windows/dpi-peek/README.md)。
+第二步用 Windows SDK 的 `rc.exe` 接上圖示與版本資訊。找不到 `rc.exe` 時會原樣複製，所以單獨跑 `cargo build` 也能用。細節見 [windows/hp-professor-1-dpi/README.md](windows/hp-professor-1-dpi/README.md)。
 
 ### B. 下載 Release 打包檔
 
@@ -142,16 +142,16 @@ python stamp_resources.py target/release/dpi-peek.exe HP-Professor-1-DPI-windows
 ## 原始碼結構
 
 ```text
-src/HIDWatcher.{h,m}    底層 HID 監聽、熱插拔事件處理、BLE 通知解析
-src/DPIMapper.{h,m}     段數與 DPI 對照表管理、HUD 文字格式化
-src/VendorChannel.{h,m} 2.4G feature 通道：中繼握手、0xD4 讀取、0x54 切換、在線偵測
-src/DPIPeek.m           選單列 Popover 面板、HUD 浮動視窗、主題渲染、自我測試
-src/probe.m             HID 診斷 CLI：描述元解析、即時封包監看、實測工具
-src/royuan.m            ROYUAN 協定 CLI：通用裝置探索、暫存器讀寫
-build.sh                編譯、組裝 Bundle 與代碼簽章
-make-identity.sh        產生本機持久簽章身分（保留 TCC 輸入監控授權）
-make-release.sh         打包發布用 Zip 與原始碼歸檔
-windows/dpi-peek/       Windows 系統匣程式：Rust + Win32，不用 GUI 框架
+src/HIDWatcher.{h,m}        底層 HID 監聽、熱插拔事件處理、BLE 通知解析
+src/DPIMapper.{h,m}         段數與 DPI 對照表管理、HUD 文字格式化
+src/VendorChannel.{h,m}     2.4G feature 通道：中繼握手、0xD4 讀取、0x54 切換、在線偵測
+src/HPProfessor1DPI.m       選單列 Popover 面板、HUD 浮動視窗、主題渲染、自我測試
+src/probe.m                 HID 診斷 CLI：描述元解析、即時封包監看、實測工具
+src/royuan.m                ROYUAN 協定 CLI：通用裝置探索、暫存器讀寫
+build.sh                    編譯、組裝 Bundle 與代碼簽章
+make-identity.sh            產生本機持久簽章身分（保留 TCC 輸入監控授權）
+make-release.sh             打包發布用 Zip 與原始碼歸檔
+windows/hp-professor-1-dpi/ Windows 系統匣程式：Rust + Win32，不用 GUI 框架
 ```
 
 驗證指令：

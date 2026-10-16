@@ -1,1 +1,0 @@
-The vector design assets in this package were created for use in DPI Peek by its project owner. No HP logo is reproduced. The supplied brand presentation images are illustrative mockups; use the SVG/PNG/ICNS assets for actual integration.

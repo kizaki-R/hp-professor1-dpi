@@ -289,7 +289,7 @@ static uint8_t checksum7(const uint8_t *b) {
     self.handler = handler;
     self.haveLast = NO;
     self.idleTicks = 99;
-    if (!self.queue) self.queue = dispatch_queue_create("com.kizakiworks.dpipeek.vendor", DISPATCH_QUEUE_SERIAL);
+    if (!self.queue) self.queue = dispatch_queue_create("com.kizakiworks.hp-professor-1-dpi.vendor", DISPATCH_QUEUE_SERIAL);
 
     self.timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.queue);
     uint64_t nano = (uint64_t)(interval * NSEC_PER_SEC);

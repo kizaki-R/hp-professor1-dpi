@@ -19,5 +19,5 @@ logs/
 ._*
 
 # Windows build output
-windows/dpi-peek/target/
+windows/hp-professor-1-dpi/target/
 

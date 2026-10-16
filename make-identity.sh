@@ -1,5 +1,5 @@
 #!/bin/bash
-# Creates a local self-signed code-signing identity for DPI Peek.
+# Creates a local self-signed code-signing identity for HP Professor 1 DPI.
 #
 # Why: TCC (privacy permissions) identifies an ad-hoc signed app by the hash of the
 # binary, so every rebuild looks like a brand new app and "輸入監控" has to be granted
