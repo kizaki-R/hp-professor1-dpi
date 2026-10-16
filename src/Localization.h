@@ -14,8 +14,6 @@ typedef NS_ENUM(NSInteger, AppLanguage) {
 @property (nonatomic) AppLanguage currentLanguage;
 
 - (NSString *)title;
-- (NSString *)pin;
-- (NSString *)pinTooltip;
 - (NSString *)quit;
 - (NSString *)themeTitle;
 - (NSString *)themeAuto;

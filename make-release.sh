@@ -1,7 +1,8 @@
 #!/bin/bash
 # Builds the release artefacts for GitHub Releases.
 #
-#   dist/DPIPeek-<version>.zip        the signed .app (users unzip into /Applications)
+#   dist/HP-Professor-1-DPI-macOS.dmg  the signed .app as a drag-to-Applications image
+#   dist/HP-Professor-1-DPI-macOS.zip  the same .app for direct extraction
 #   dist/hp-professor1-dpi-<version>-src.tar.gz  source tarball without the local signing identity
 #
 # The app is signed with the local self-signed identity (KizakiWorks Local) when it exists.
@@ -13,14 +14,14 @@ cd "$(dirname "$0")"
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" src/Info.plist 2>/dev/null || echo 1.1)
 MAC_DMG="HP-Professor-1-DPI-macOS.dmg"
 MAC_ZIP="HP-Professor-1-DPI-macOS.zip"
-LEGACY_ZIP="DPIPeek-$VERSION.zip"
 DIST="dist"
 
 echo "==> building"
 ./build.sh
 
 mkdir -p "$DIST"
-rm -f "$DIST/$MAC_DMG" "$DIST/$MAC_ZIP" "$DIST/$LEGACY_ZIP" "$DIST/hp-professor1-dpi-$VERSION-src.tar.gz"
+rm -f "$DIST/$MAC_DMG" "$DIST/$MAC_ZIP" "$DIST/hp-professor1-dpi-$VERSION-src.tar.gz"
+rm -f "$DIST/DPIPeek-$VERSION.zip"   # retired alias; delete any copy left from an older run
 
 echo "==> packaging standard macOS installer (.dmg)"
 STAGING="/tmp/hp-dpi-dmg-staging"
@@ -35,7 +36,6 @@ rm -rf "$STAGING"
 echo "==> packaging zip archives"
 # ditto keeps the bundle metadata intact (plain zip can break .app bundles)
 ditto -c -k --sequesterRsrc --keepParent "build.noindex/HP Professor 1 DPI.app" "$DIST/$MAC_ZIP"
-cp "$DIST/$MAC_ZIP" "$DIST/$LEGACY_ZIP"
 
 echo "==> packaging source"
 tar --exclude='./dist' --exclude='./build' --exclude='./logs' --exclude='./signing' \

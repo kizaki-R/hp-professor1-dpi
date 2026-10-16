@@ -46,22 +46,6 @@ static NSString *const kLanguageKey = @"HPProfessor1DPI.language";
     return @"HP Professor 1 DPI";
 }
 
-- (NSString *)pin {
-    switch (self.currentLanguage) {
-        case AppLangZhCn: return @"📌 钉选";
-        case AppLangEn:   return @"📌 Pin";
-        default:          return @"📌 釘選";
-    }
-}
-
-- (NSString *)pinTooltip {
-    switch (self.currentLanguage) {
-        case AppLangZhCn: return @"钉选后点击外部不会自动关闭面板";
-        case AppLangEn:   return @"Keep panel open when clicking outside";
-        default:          return @"釘選後點擊外部不會自動關閉面板";
-    }
-}
-
 - (NSString *)quit {
     switch (self.currentLanguage) {
         case AppLangZhCn: return @"退出";
