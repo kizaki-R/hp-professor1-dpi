@@ -4,6 +4,7 @@
 
 static NSString *const kPresetsKey = @"HPProfessor1DPI.presets.v2";
 static NSString *const kLegacyPresetsKey = @"DPIPeek.presets.v2";   // pre-1.1 name; read as a fallback
+static NSString *const kCurrentStepKey = @"HPProfessor1DPI.currentStep";
 static const NSInteger kStepCount = 7;
 
 @implementation DPIMapper
@@ -20,6 +21,11 @@ static const NSInteger kStepCount = 7;
 
 + (instancetype)loadFromDefaults {
     DPIMapper *m = [DPIMapper new];
+    id savedStep = [NSUserDefaults.standardUserDefaults objectForKey:kCurrentStepKey];
+    if ([savedStep isKindOfClass:NSNumber.class]) {
+        NSInteger step = [savedStep integerValue];
+        if (step >= 0 && step < kStepCount) m.currentStep = step;
+    }
     NSArray *saved = [NSUserDefaults.standardUserDefaults arrayForKey:kPresetsKey];
     if (saved.count == 0) {
         // Settings written by a pre-1.1 build. Only the two keys are renamed, so
@@ -41,7 +47,21 @@ static const NSInteger kStepCount = 7;
 }
 
 - (void)save {
-    [NSUserDefaults.standardUserDefaults setObject:self.presets forKey:kPresetsKey];
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    [defaults setObject:self.presets forKey:kPresetsKey];
+    if (self.currentStep >= 0 && self.currentStep < kStepCount) {
+        [defaults setInteger:self.currentStep forKey:kCurrentStepKey];
+    }
+}
+
+- (void)setCurrentStep:(NSInteger)currentStep {
+    if (currentStep < -1 || currentStep >= kStepCount) return;
+    _currentStep = currentStep;
+    // Keep the last known hardware stage across launches. In Bluetooth mode the
+    // mouse does not broadcast its current stage until the DPI button is pressed.
+    if (currentStep >= 0) {
+        [NSUserDefaults.standardUserDefaults setInteger:currentStep forKey:kCurrentStepKey];
+    }
 }
 
 + (NSInteger)stepFromVendorPayload:(NSData *)payload {

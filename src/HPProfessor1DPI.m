@@ -52,6 +52,7 @@ static void migrateLegacyDefaults(void) {
     NSArray<NSArray<NSString *> *> *pairs = @[
         @[@"DPIPeek.presets.v2", @"HPProfessor1DPI.presets.v2"],
         @[@"DPIPeek.theme",      @"HPProfessor1DPI.theme"],
+        @[@"DPIPeek.currentStep", @"HPProfessor1DPI.currentStep"],
     ];
     for (NSArray<NSString *> *pair in pairs) {
         NSString *oldKey = pair[0], *newKey = pair[1];
@@ -215,12 +216,13 @@ static void migrateLegacyDefaults(void) {
     (void)note;
     [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
     migrateLegacyDefaults();
-    [self buildMenuBar];
     [self buildMainMenu];
 
     self.watcher = [HIDWatcher new];
     self.mapper = [DPIMapper loadFromDefaults];
     self.currentTheme = [NSUserDefaults.standardUserDefaults integerForKey:@"HPProfessor1DPI.theme"]; // 0=Auto, 1=Light, 2=Dark
+    // Load the saved DPI stage before the status item chooses its stage icon.
+    [self buildMenuBar];
 
     __weak AppDelegate *weakSelf = self;
     self.watcher.reportHandler = ^(HIDInterfaceInfo *iface, uint32_t reportID, NSData *payload, NSDate *when) {
@@ -345,9 +347,17 @@ static void migrateLegacyDefaults(void) {
     NSStatusBarButton *btn = self.statusItem.button;
     if (!btn) return;
 
-    // Load VELOCITY stage icon (1..7) or fallback
+    // Bluetooth only reports a stage after the physical DPI button is pressed.
+    // Never present the unknown state as stage 1: show a neutral label instead.
+    if (step < 0 || step >= 7) {
+        btn.image = nil;
+        btn.title = (batt > 0 && batt <= 100)
+            ? [NSString stringWithFormat:@"DPI %d%%", batt]
+            : @"DPI";
+        return;
+    }
+
     int stage = (int)step + 1; // step 0..6 -> stage 1..7
-    if (stage < 1 || stage > 7) stage = 1;
     NSString *iconName = [NSString stringWithFormat:@"menu_stage_%d", stage];
     NSImage *img = [NSImage imageNamed:iconName] ?: [[NSBundle mainBundle] imageForResource:iconName];
     if (img) {
@@ -355,12 +365,9 @@ static void migrateLegacyDefaults(void) {
         img.size = NSMakeSize(22.5, 18.0);
         btn.image = img;
     }
-
-    if (batt > 0 && batt <= 100) {
-        btn.title = [NSString stringWithFormat:@" %d%%", batt];
-    } else {
-        btn.title = @"";
-    }
+    btn.title = (batt > 0 && batt <= 100)
+        ? [NSString stringWithFormat:@" %d%%", batt]
+        : @"";
 }
 
 - (void)statusItemClicked:(id)sender {
@@ -867,7 +874,7 @@ static void migrateLegacyDefaults(void) {
                                               dpiText.length ? dpiText : ([loc currentLanguage] == AppLangEn ? @"Connected" : @"已連線"),
                                               (batt > 0 ? [NSString stringWithFormat:@" · 電量 %d%%", batt] : @"")];
         } else {
-            [self updateMenuBarDisplayWithStep:0 battery:-1];
+            [self updateMenuBarDisplayWithStep:self.mapper.currentStep battery:-1];
             modeText = [loc modeOffline];
             self.deviceLabel.stringValue = [loc deviceOffline];
             self.presetsLabel.stringValue = [loc presetsHeaderOffline];
@@ -1096,6 +1103,15 @@ static int runSelfTest(void) {
 
     DPIMapper *m = [DPIMapper new];
     CHECK(m.presets.count == 7, "seven DPI slots");
+
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    NSString *currentStepKey = @"HPProfessor1DPI.currentStep";
+    id previousStep = [defaults objectForKey:currentStepKey];
+    m.currentStep = 6;
+    DPIMapper *reloaded = [DPIMapper loadFromDefaults];
+    CHECK(reloaded.currentStep == 6, "restores the last active DPI stage after relaunch");
+    if (previousStep) [defaults setObject:previousStep forKey:currentStepKey];
+    else [defaults removeObjectForKey:currentStepKey];
     CHECK([[m hudTitleForStep:2] isEqualToString:@"第 3 段"], "unknown slot shows the step number");
     [m setPreset:@1600 forStep:2];
     CHECK([[m hudTitleForStep:2] isEqualToString:@"1600 DPI"], "known slot shows the DPI value");

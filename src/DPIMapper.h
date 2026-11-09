@@ -6,6 +6,8 @@
 //       66 0F 01|00 00 …             trailing status flag, ignored
 #import <Foundation/Foundation.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface DPIMapper : NSObject
 
 /// 7 slots; each entry is an NSNumber (known DPI) or NSNull (not set yet).
@@ -19,7 +21,7 @@
 + (NSInteger)stepFromVendorPayload:(NSData *)payload;
 
 - (void)setPreset:(nullable NSNumber *)value forStep:(NSInteger)step;
-- (NSNumber *)presetForStep:(NSInteger)step;      // nil when unset
+- (nullable NSNumber *)presetForStep:(NSInteger)step;      // nil when unset
 - (NSInteger)stepCount;
 
 /// "1600 DPI" when known, otherwise "第 3 段".
@@ -27,3 +29,5 @@
 - (NSString *)hudSubtitleForStep:(NSInteger)step;
 
 @end
+
+NS_ASSUME_NONNULL_END
